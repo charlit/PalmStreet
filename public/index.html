@@ -1281,10 +1281,15 @@
     return true;
   }
 
+  // Position (en distance monde) où le prochain élément apparaît à l'écran
+  function spawnPointWorldX() {
+    return totalDistance + (W + 20 - player.x);
+  }
+
   // ---- Obstacles : cônes et rails (à sauter ou grinder) ----
   function spawnObstacle() {
     // position (en distance monde) où l'obstacle apparaît, pour tester le relief à cet endroit
-    const spawnWorldX = totalDistance + (W + 20 - player.x);
+    const spawnWorldX = spawnPointWorldX();
 
     // le tout premier obstacle de la partie, puis un nouveau tous les 5000 points,
     // est ce grand rail arc-en-ciel (plus facile à négocier + retour ludique régulier)
@@ -1451,7 +1456,10 @@
     // le précédent ait totalement dégagé la place (donc jamais superposés).
     nextSpawnIn--;
     if (nextSpawnIn <= 0) {
-      const spawnCoinsThisTime = Math.random() < 0.38;
+      // pas de plot (ni de rail) dans une montée : uniquement des pièces,
+      // les obstacles n'apparaissent que sur le plat ou en descente
+      const uphillHere = terrainInfoAt(spawnPointWorldX()).kind === 'up';
+      const spawnCoinsThisTime = uphillHere || Math.random() < 0.38;
       const widthJustSpawned = spawnCoinsThisTime ? spawnCoinRow() : spawnObstacle();
 
       const safetyMarginPx = 55; // marge de sécurité en pixels entre deux éléments
