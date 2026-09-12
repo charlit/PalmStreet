@@ -55,8 +55,8 @@
     width: 100%;
     height: auto;
     max-height: 100dvh;
-    border: 4px solid #ff2fa0;
-    box-shadow: 0 0 30px rgba(255, 47, 160, 0.4);
+    border: 4px solid #ff7a1a;
+    box-shadow: 0 0 30px rgba(255, 122, 26, 0.4);
     image-rendering: pixelated;
     touch-action: none;
     -webkit-tap-highlight-color: transparent;
@@ -66,10 +66,10 @@
     position: absolute;
     top: 12px;
     left: 24px;
-    color: #ff2fa0;
+    color: #ff7a1a;
     font-size: clamp(12px, 3.6vw, 18px);
     font-weight: bold;
-    text-shadow: 0 0 6px rgba(255,47,160,0.6);
+    text-shadow: 0 0 6px rgba(255,122,26,0.6);
     letter-spacing: 1px;
     user-select: none;
   }
@@ -100,12 +100,12 @@
     top: 8%;
     left: 50%;
     transform: translate(-50%, -14px) scale(0.85);
-    color: #ff2fa0;
+    color: #ff7a1a;
     font-family: 'Courier New', monospace;
     font-weight: bold;
     font-size: clamp(26px, 9vw, 44px);
     letter-spacing: 3px;
-    text-shadow: 0 0 12px rgba(255,47,160,0.9), 0 0 28px rgba(255,47,160,0.6);
+    text-shadow: 0 0 12px rgba(255,122,26,0.9), 0 0 28px rgba(255,122,26,0.6);
     opacity: 0;
     pointer-events: none;
     white-space: nowrap;
@@ -164,11 +164,11 @@
     box-sizing: border-box;
   }
   #overlay h1 {
-    color: #ff2fa0;
+    color: #ff7a1a;
     font-size: clamp(30px, 11vw, 48px);
     margin: 0 0 4px 0;
     letter-spacing: 2px;
-    text-shadow: 0 0 12px rgba(255,47,160,0.9), 0 0 26px rgba(255,47,160,0.5);
+    text-shadow: 0 0 12px rgba(255,122,26,0.9), 0 0 26px rgba(255,122,26,0.5);
     font-family: 'Courier New', monospace;
   }
   #overlay h1 span {
@@ -222,9 +222,9 @@
     -webkit-tap-highlight-color: transparent;
   }
   #btnStart {
-    background: #ff2fa0;
+    background: #ff7a1a;
     color: #0d0d12;
-    box-shadow: 0 0 14px rgba(255,47,160,0.6);
+    box-shadow: 0 0 14px rgba(255,122,26,0.6);
   }
   #btnScores {
     background: transparent;
@@ -297,8 +297,8 @@
   }
   #leaderboardModal .lbBox {
     background: #17172a;
-    border: 2px solid #ff2fa0;
-    box-shadow: 0 0 24px rgba(255,47,160,0.5);
+    border: 2px solid #ff7a1a;
+    box-shadow: 0 0 24px rgba(255,122,26,0.5);
     border-radius: 10px;
     padding: 18px 22px;
     width: 260px;
@@ -308,11 +308,11 @@
     text-align: center;
   }
   #leaderboardModal h2 {
-    color: #ff2fa0;
+    color: #ff7a1a;
     font-size: 20px;
     letter-spacing: 3px;
     margin: 0 0 12px 0;
-    text-shadow: 0 0 10px rgba(255,47,160,0.8);
+    text-shadow: 0 0 10px rgba(255,122,26,0.8);
   }
   .lbMsg { color: #cfd8ff; font-size: 12px; }
   .lbList { list-style: none; margin: 0; padding: 0; }
@@ -337,7 +337,7 @@
     padding: 8px 20px;
     border: none;
     border-radius: 6px;
-    background: #ff2fa0;
+    background: #ff7a1a;
     color: #0d0d12;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
@@ -858,7 +858,7 @@
 
   // ---- Décors qui changent selon le score : Venice -> Santa Monica -> Malibu -> Venice... ----
   const themes = [
-    { key: 'venice',      name: 'VENICE BEACH',  sky: ['#12283a', '#e8935a'], silhouette: '#0a1c28', sun: '#ffd8a8', accent: '#ff2fa0', draw: drawVeniceUnit },
+    { key: 'venice',      name: 'VENICE BEACH',  sky: ['#12283a', '#e8935a'], silhouette: '#0a1c28', sun: '#ffd8a8', accent: '#ff7a1a', draw: drawVeniceUnit },
     { key: 'santamonica', name: 'SANTA MONICA',  sky: ['#1a2f3f', '#3d6b6f'], silhouette: '#0d2024', sun: '#ffe9a8', accent: '#7fffd4', draw: drawSantaMonicaUnit },
     { key: 'malibu',      name: 'MALIBU',        sky: ['#241a35', '#4a2f55'], silhouette: '#160f22', sun: '#ffb3d9', accent: '#b400ff', draw: drawMalibuUnit }
   ];
@@ -1227,7 +1227,7 @@
         '<div id="scoreSaveStatus"></div>' +
         '<button id="btnViewScoresOver" type="button" class="secondaryBtn">Voir les scores</button>' +
       '</div>' +
-      '<p style="margin-top:10px;color:#ff2fa0;">Appuie ailleurs pour retenter</p>';
+      '<p style="margin-top:10px;color:#ff7a1a;">Appuie ailleurs pour retenter</p>';
     overlay.classList.remove('hidden');
 
     // empêche de relancer la partie par erreur en tapant dans la zone de saisie
@@ -1653,8 +1653,8 @@
 
   function drawParticles() {
     for (const p of particles) {
-      const color = p.color || '#ff2fa0';
-      const [r, g, b] = hexToRgb(color.length === 7 ? color : '#ff2fa0');
+      const color = p.color || '#ff7a1a';
+      const [r, g, b] = hexToRgb(color.length === 7 ? color : '#ff7a1a');
       ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + Math.max(0, p.life / 14) + ')';
       ctx.fillRect(p.x, p.y, 4, 4);
     }
@@ -1805,7 +1805,7 @@
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(charImg, 0, 0, drawW, drawH);
     } else {
-      ctx.fillStyle = '#ff2fa0';
+      ctx.fillStyle = '#ff7a1a';
       ctx.fillRect(0, 0, drawW, drawH);
     }
 
@@ -1888,7 +1888,7 @@
     ctx.fillRect(deckX + 4, deckY - 2, deckW - 8, 2);
 
     // liseré de couleur sur la tranche de la planche
-    ctx.fillStyle = '#ff2fa0';
+    ctx.fillStyle = '#ff7a1a';
     ctx.fillRect(deckX + 3, deckY + deckH - 1, deckW - 6, 1);
 
     ctx.restore();
@@ -1936,7 +1936,7 @@
     ctx.lineTo(deckW / 2 - 3, deckH);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = '#ff2fa0';
+    ctx.fillStyle = '#ff7a1a';
     ctx.fillRect(-deckW / 2 + 4, -1, deckW - 8, 2);
 
     ctx.fillStyle = '#1a1a1a';
