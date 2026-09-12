@@ -1451,7 +1451,9 @@
         obstacles.splice(i, 1);
         continue;
       }
-      ob.y = groundYAt(ob.x) - ob.h; // suit le relief pendant qu'il défile
+      // hauteur calculée au centre de l'obstacle (pas au bord gauche) pour que
+      // les rails larges restent bien centrés sur la pente, pieds compris
+      ob.y = groundYAt(ob.x + ob.w / 2) - ob.h;
 
       const obBox = { x: ob.x, y: ob.y, w: ob.w, h: ob.h };
 
@@ -1667,9 +1669,13 @@
         ctx.fillRect(ob.x, ob.y, ob.w, 4);
         ctx.shadowBlur = 0;
         ctx.fillStyle = edgeColor;
-        // pieds/supports qui descendent jusqu'au sol
-        ctx.fillRect(ob.x, ob.y + 4, 4, ob.h - 4);
-        ctx.fillRect(ob.x + ob.w - 4, ob.y + 4, 4, ob.h - 4);
+        // pieds/supports qui descendent jusqu'au sol réel de chaque côté (et non
+        // une longueur fixe), pour ne jamais laisser de vide en pente
+        const legTopY = ob.y + 4;
+        const leftLegLen = Math.max(2, groundYAt(ob.x + 2) - legTopY);
+        const rightLegLen = Math.max(2, groundYAt(ob.x + ob.w - 2) - legTopY);
+        ctx.fillRect(ob.x, legTopY, 4, leftLegLen);
+        ctx.fillRect(ob.x + ob.w - 4, legTopY, 4, rightLegLen);
       }
     }
   }
