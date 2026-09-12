@@ -745,6 +745,87 @@
   let oceanScrollX3 = 0;
   let wheelSpinAngle = 0;
 
+  // ---- Terrain : alternance plat / montées / descentes ----
+  // Le sol n'est plus une ligne plate : des collines s'enchaînent (plat -> montée
+  // -> descente -> plat -> ...), et la vitesse augmente pendant les descentes
+  // (et diminue légèrement dans les montées), pour un vrai ressenti de relief.
+  let totalDistance = 0;    // distance totale parcourue dans le monde (jamais remise à 0 sauf reset)
+  let terrainSegments = []; // segments consécutifs { start, end, elevStart, elevEnd, kind }
+  let terrainGenUpTo = 0;   // distance monde jusqu'où le terrain est déjà généré
+  const HILL_MAX_BOOST = 0.55; // vitesse maximale gagnée en pleine descente (+55%)
+  const HILL_MAX_SLOW = 0.22;  // vitesse maximale perdue en pleine montée (-22%)
+
+  function resetTerrain() {
+    totalDistance = 0;
+    terrainSegments = [{ start: 0, end: 420, elevStart: 0, elevEnd: 0, kind: 'flat' }];
+    terrainGenUpTo = 420;
+  }
+
+  // Ajoute le prochain segment de terrain : après un plat vient toujours une
+  // montée, après une montée toujours une descente qui revient au niveau de
+  // base, puis à nouveau un plat — ça garantit l'alternance plat/courbes
+  // demandée, sans jamais faire dériver le niveau du sol vers le haut ou le bas.
+  function pushNextTerrainSegment() {
+    const last = terrainSegments[terrainSegments.length - 1];
+    let kind, length, elevEnd;
+    if (last.kind === 'flat') {
+      kind = 'up';
+      length = 130 + Math.random() * 110;
+      elevEnd = 45 + Math.random() * 55; // hauteur de la colline
+    } else if (last.kind === 'up') {
+      kind = 'down';
+      length = 130 + Math.random() * 110;
+      elevEnd = 0; // redescend toujours au niveau de base
+    } else {
+      kind = 'flat';
+      length = 240 + Math.random() * 260;
+      elevEnd = 0;
+    }
+    const seg = { start: last.end, end: last.end + length, elevStart: last.elevEnd, elevEnd, kind };
+    terrainSegments.push(seg);
+    terrainGenUpTo = seg.end;
+  }
+
+  function ensureTerrainAhead(uptoDistance) {
+    while (terrainGenUpTo < uptoDistance) pushNextTerrainSegment();
+    // purge les segments trop loin derrière pour ne pas accumuler indéfiniment
+    while (terrainSegments.length > 2 && terrainSegments[1].end < totalDistance - 200) {
+      terrainSegments.shift();
+    }
+  }
+
+  // Hauteur du terrain (0 = niveau de base) à une distance monde donnée, avec
+  // une interpolation en S (cosinus) : pente nulle à l'entrée et à la sortie
+  // de chaque segment, donc des collines bien arrondies, jamais de cassure.
+  function terrainInfoAt(worldX) {
+    for (let i = 0; i < terrainSegments.length; i++) {
+      const s = terrainSegments[i];
+      if (worldX <= s.end || i === terrainSegments.length - 1) {
+        const t = Math.max(0, Math.min(1, (worldX - s.start) / (s.end - s.start)));
+        const eased = (1 - Math.cos(t * Math.PI)) / 2;
+        const elev = s.elevStart + (s.elevEnd - s.elevStart) * eased;
+        return { elev, kind: s.kind, t };
+      }
+    }
+    return { elev: 0, kind: 'flat', t: 0 };
+  }
+
+  // Multiplicateur de vitesse selon le relief : pic au milieu de la pente,
+  // nul en haut/bas de colline (raccord doux avec le plat).
+  function terrainSpeedMultiplier(worldX) {
+    const info = terrainInfoAt(worldX);
+    const wave = Math.sin(info.t * Math.PI);
+    if (info.kind === 'down') return 1 + HILL_MAX_BOOST * wave;
+    if (info.kind === 'up') return 1 - HILL_MAX_SLOW * wave;
+    return 1;
+  }
+
+  // Hauteur du sol (en coordonnées écran) à une position écran donnée
+  function groundYAt(screenX) {
+    const worldX = totalDistance + (screenX - player.x);
+    return GROUND_Y - terrainInfoAt(worldX).elev;
+  }
+
   // Joueur (skateur)
   const player = {
     x: 55,
@@ -1043,6 +1124,9 @@
     wheelSpinAngle = 0;
     bigRailThreshold = 0;
     flyingBoard = null;
+    resetTerrain();
+    ensureTerrainAhead(W + 150);
+    player.y = groundYAt(player.x);
 
     // décor : vrais objets qui défilent, réinitialisés et pré-remplis à l'écran
     landmarks = [];
@@ -1217,13 +1301,14 @@
 
   // ---- Pièces bonus (éclair jaune) : uniquement placées seules, jamais sur un obstacle ----
   function spawnCoinRow() {
-    const heights = [GROUND_Y - 20, GROUND_Y - 60, GROUND_Y - 95];
-    const y = heights[Math.floor(Math.random() * heights.length)];
+    const offsets = [20, 60, 95]; // hauteur au-dessus du sol, suit le relief ensuite
+    const offset = offsets[Math.floor(Math.random() * offsets.length)];
     const count = 3 + Math.floor(Math.random() * 3);
     const gap = 26;
     const startX = W + 20;
     for (let i = 0; i < count; i++) {
-      coins.push({ x: startX + i * gap, y: y, r: 9, collected: false, spin: Math.random() * Math.PI * 2 });
+      const x = startX + i * gap;
+      coins.push({ x, y: groundYAt(x) - offset, offset, r: 9, collected: false, spin: Math.random() * Math.PI * 2 });
     }
     return (count - 1) * gap + 18; // largeur totale occupée par la rangée
   }
@@ -1236,6 +1321,11 @@
     frame++;
     score += 1;
     speed = Math.min(maxSpeed, baseSpeed + Math.floor(score / speedStepScore) * speedStep);
+
+    // relief : vitesse boostée en descente, un peu réduite en montée
+    speed *= terrainSpeedMultiplier(totalDistance);
+    totalDistance += speed;
+    ensureTerrainAhead(totalDistance + W + 100);
 
     // bandeau "STOKED" en rose, à chaque palier de 5000 points (5000, 10000, 15000...)
     if (score >= milestoneNextThreshold) {
@@ -1275,6 +1365,7 @@
     const duckH = 34;
     const standH = 58;
     player.h = player.ducking ? duckH : standH;
+    const groundHere = groundYAt(player.x); // suit le relief (plat/montée/descente)
 
     if (grinding) {
       // collé au rail, suit sa hauteur, avance avec le monde
@@ -1299,15 +1390,15 @@
     } else if (!player.onGround) {
       player.vy += gravity;
       player.y += player.vy;
-      if (player.y >= GROUND_Y) {
-        player.y = GROUND_Y;
+      if (player.y >= groundHere) {
+        player.y = groundHere;
         player.vy = 0;
         player.onGround = true;
         canTrick = true;
         landTimer = 10;
       }
     } else {
-      player.y = GROUND_Y;
+      player.y = groundHere;
     }
     player.tilt = player.vy * 1.1;
     if (landTimer > 0) landTimer--;
@@ -1360,6 +1451,7 @@
         obstacles.splice(i, 1);
         continue;
       }
+      ob.y = groundYAt(ob.x) - ob.h; // suit le relief pendant qu'il défile
 
       const obBox = { x: ob.x, y: ob.y, w: ob.w, h: ob.h };
 
@@ -1393,6 +1485,7 @@
       c.x -= speed;
       c.spin += 0.15;
       if (c.x < -20) { coins.splice(i, 1); continue; }
+      c.y = groundYAt(c.x) - c.offset; // suit le relief pendant qu'elle défile
       const coinBox = { x: c.x - c.r, y: c.y - c.r, w: c.r * 2, h: c.r * 2 };
       if (rectsOverlap(coinHitbox, coinBox)) {
         coins.splice(i, 1);
@@ -1415,7 +1508,7 @@
     // particules de vitesse (petites trainées)
     const theme = currentTheme();
     if (frame % 3 === 0 && !grinding) {
-      particles.push({ x: player.x - 4, y: GROUND_Y - 4, life: 14, vy: -0.5 - Math.random(), color: theme.accent });
+      particles.push({ x: player.x - 4, y: groundHere - 4, life: 14, vy: -0.5 - Math.random(), color: theme.accent });
     }
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -1475,26 +1568,44 @@
       ctx.restore();
     }
 
-    // sol
+    // sol : suit le profil de terrain (plat / montées / descentes), échantillonné
+    // par petits pas le long de l'écran pour dessiner une courbe bien arrondie
+    const groundStep = 10;
     ctx.fillStyle = '#0d0616';
-    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, groundYAt(0));
+    for (let gx = groundStep; gx <= W; gx += groundStep) {
+      ctx.lineTo(gx, groundYAt(gx));
+    }
+    ctx.lineTo(W, groundYAt(W));
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, GROUND_Y);
-    ctx.lineTo(W, GROUND_Y);
+    ctx.moveTo(0, groundYAt(0));
+    for (let gx = groundStep; gx <= W; gx += groundStep) {
+      ctx.lineTo(gx, groundYAt(gx));
+    }
     ctx.stroke();
 
-    // pointilles de vitesse sur le sol
+    // pointilles de vitesse sur le sol, suivent aussi la courbe
     const [r, g, b] = hexToRgb(theme.accent);
     ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',0.35)';
     ctx.lineWidth = 2;
     ctx.setLineDash([16, 14]);
+    ctx.lineDashOffset = -groundOffset;
     ctx.beginPath();
-    ctx.moveTo(groundOffset, GROUND_Y + 14);
-    ctx.lineTo(W, GROUND_Y + 14);
+    ctx.moveTo(0, groundYAt(0) + 14);
+    for (let gx = groundStep; gx <= W; gx += groundStep) {
+      ctx.lineTo(gx, groundYAt(gx) + 14);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
 
     // etiquette du decor en cours (petit repere discret)
     ctx.font = '10px monospace';
@@ -1750,8 +1861,9 @@
     b.y += b.vy;
     b.rot += b.spin;
 
-    if (b.y >= GROUND_Y) {
-      b.y = GROUND_Y;
+    const boardGroundY = groundYAt(b.x);
+    if (b.y >= boardGroundY) {
+      b.y = boardGroundY;
       b.vy *= -0.45;
       b.vx *= 0.7;
       b.spin *= 0.55;
