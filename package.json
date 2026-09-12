@@ -1,0 +1,14 @@
+{
+  "name": "palmstreet-selfhost",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serveur auto-hébergé pour PalmStreet (jeu + classement + visites), à la place de Netlify",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "geoip-lite": "^1.4.10"
+  }
+}
