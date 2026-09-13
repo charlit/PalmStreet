@@ -263,11 +263,6 @@
     image-rendering: pixelated;
     -webkit-user-drag: none;
   }
-  /* Guigui est un peu plus grand que les autres, y compris dans l'aperçu */
-  #charCardGuigui img {
-    width: 40px;
-    height: 68px;
-  }
   .charCard .charName {
     font-size: 10px;
     letter-spacing: 1px;
@@ -1880,17 +1875,10 @@
     }
   }
 
-  // ---- Taille du personnage à l'écran : Guigui est dessiné un peu plus grand ----
-  const CHAR_SCALE = { guigui: 1.18 };
-  function currentCharScale() {
-    return CHAR_SCALE[selectedCharacter] || 1;
-  }
-
   function drawPlayer() {
     ctx.save();
-    const charScale = currentCharScale();
-    const drawH = (player.h + 10) * charScale;
-    const drawW = player.w * charScale;
+    const drawH = player.h + 10;
+    const drawW = player.w;
     const px = player.x;
     const py = player.y - drawH;
     const grounded = player.onGround && !grinding;
