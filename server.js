@@ -10,7 +10,7 @@ let geoip = null;
 try { geoip = require('geoip-lite'); } catch (e) { /* module optionnel */ }
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8082;
 const DATA_DIR = path.join(__dirname, 'data');
 const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
 const VISITS_FILE = path.join(DATA_DIR, 'visits.json');

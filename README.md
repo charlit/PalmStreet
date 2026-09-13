@@ -58,12 +58,12 @@ Vérifie que ça tourne :
 ```
 docker compose logs -f
 ```
-Tu dois voir `PalmStreet auto-hébergé, écoute sur le port 8080`. Ctrl+C
+Tu dois voir `PalmStreet auto-hébergé, écoute sur le port 8082`. Ctrl+C
 pour quitter l'affichage des logs (le serveur continue de tourner).
 
 Teste en local sur le Mac mini :
 ```
-curl http://localhost:8080/api/scores
+curl http://localhost:8082/api/scores
 ```
 Tu dois voir `[]`.
 
@@ -72,7 +72,7 @@ Tu dois voir `[]`.
 Toujours en SSH sur le Mac mini :
 
 ```
-sudo tailscale funnel --bg 8080
+sudo tailscale funnel --bg 8082
 ```
 
 Tailscale affiche alors une URL publique du style :

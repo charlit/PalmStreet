@@ -12,7 +12,7 @@ COPY public ./public
 # les scores et visites survivent aux redémarrages/mises à jour du conteneur
 RUN mkdir -p /app/data
 
-EXPOSE 8080
-ENV PORT=8080
+EXPOSE 8082
+ENV PORT=8082
 
 CMD ["node", "server.js"]
