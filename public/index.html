@@ -875,9 +875,17 @@
   const BOSS_MAX_HP = 1000;
   const TOOTH_DAMAGE = 100;
   const TOOTH_FIRE_INTERVAL = 22; // frames entre deux tirs de dents
+  // phase aérienne : toutes les ~10s le boss s'envole et lâche des plots
+  const BOSS_PHASE_INTERVAL = 600;  // frames au sol avant le prochain envol (~10s à 60fps)
+  const BOSS_RISE_FRAMES = 30;
+  const BOSS_HOVER_FRAMES = 150;
+  const BOSS_DESCEND_FRAMES = 30;
+  const BOSS_AIR_HEIGHT = 150;
+  const BOSS_DROP_INTERVAL = 35;    // frames entre deux plots lâchés pendant l'envol
+  const BOSS_DROP_COUNT = 4;        // nombre de plots lâchés par envol
   let bossFightActive = false;
   let bossDefeatedOnce = false; // empêche de redéclencher le combat après l'avoir gagné
-  let boss = null;   // { x, y, hp, maxHp, flameFrame, hitFlash, bob }
+  let boss = null;   // { x, y, hp, maxHp, flameFrame, hitFlash, bob, airOffset, phase, ... }
   let teeth = [];    // projectiles envoyés sur le boss : { x, y, vx }
   let toothCooldown = 0;
   let oceanScrollX1 = 0;
@@ -1396,7 +1404,13 @@
       maxHp: BOSS_MAX_HP,
       flameFrame: 0,
       hitFlash: 0,
-      bob: 0
+      bob: 0,
+      airOffset: 0,      // décalage vertical pendant la phase aérienne (0 = au sol)
+      phase: 'ground',   // ground | rising | airborne | descending
+      phaseTimer: BOSS_PHASE_INTERVAL,
+      phaseElapsed: 0,
+      dropTimer: 0,
+      dropsDone: 0
     };
     teeth = [];
     toothCooldown = 40; // laisse une petite respiration avant le premier tir
@@ -1416,7 +1430,50 @@
     boss.bob = Math.sin(frame * 0.1) * 3;
     if (boss.hitFlash > 0) boss.hitFlash--;
 
-    // tir automatique de dents sur le boss
+    // ---- phase aérienne : toutes les ~10s le boss s'envole et lâche des plots
+    // que le joueur doit sauter, avant de se reposer et reprendre le combat ----
+    if (boss.phase === 'ground') {
+      boss.phaseTimer--;
+      if (boss.phaseTimer <= 0) {
+        boss.phase = 'rising';
+        boss.phaseElapsed = 0;
+      }
+    } else if (boss.phase === 'rising') {
+      boss.phaseElapsed++;
+      const t = Math.min(1, boss.phaseElapsed / BOSS_RISE_FRAMES);
+      boss.airOffset = -BOSS_AIR_HEIGHT * Math.sin(t * Math.PI / 2); // ease-out vers le haut
+      if (t >= 1) {
+        boss.phase = 'airborne';
+        boss.phaseElapsed = 0;
+        boss.dropsDone = 0;
+        boss.dropTimer = 20; // petit délai avant le premier plot lâché
+      }
+    } else if (boss.phase === 'airborne') {
+      boss.phaseElapsed++;
+      boss.airOffset = -BOSS_AIR_HEIGHT + Math.sin(boss.phaseElapsed * 0.15) * 6;
+      boss.dropTimer--;
+      if (boss.dropTimer <= 0 && boss.dropsDone < BOSS_DROP_COUNT) {
+        dropBossCone();
+        boss.dropsDone++;
+        boss.dropTimer = BOSS_DROP_INTERVAL;
+      }
+      if (boss.phaseElapsed >= BOSS_HOVER_FRAMES) {
+        boss.phase = 'descending';
+        boss.phaseElapsed = 0;
+      }
+    } else if (boss.phase === 'descending') {
+      boss.phaseElapsed++;
+      const t = Math.min(1, boss.phaseElapsed / BOSS_DESCEND_FRAMES);
+      boss.airOffset = -BOSS_AIR_HEIGHT * (1 - t);
+      if (t >= 1) {
+        boss.airOffset = 0;
+        boss.phase = 'ground';
+        boss.phaseTimer = BOSS_PHASE_INTERVAL;
+      }
+    }
+
+    // tir automatique de dents sur le boss (inutile de viser : le boss est hors
+    // de portée pendant qu'il est en l'air, il faut alors éviter les plots)
     toothCooldown--;
     if (toothCooldown <= 0) {
       teeth.push({ x: player.x + player.w, y: player.y - player.h * 0.55, vx: 7.5 });
@@ -1425,7 +1482,7 @@
     }
 
     // avance des dents + collision avec le boss
-    const bossBox = { x: boss.x - 34, y: boss.y - 60 + boss.bob, w: 68, h: 60 };
+    const bossBox = { x: boss.x - 34, y: boss.y - 60 + boss.bob + boss.airOffset, w: 68, h: 60 };
     for (let i = teeth.length - 1; i >= 0; i--) {
       const t = teeth[i];
       t.x += t.vx;
@@ -1446,6 +1503,20 @@
       }
       if (t.x > W + 20) teeth.splice(i, 1);
     }
+  }
+
+  // ---- Plot lâché par le boss depuis les airs : chute puis se comporte comme
+  // un obstacle normal (à sauter) une fois au sol ----
+  function dropBossCone() {
+    const dropX = boss.x + (Math.random() - 0.5) * 60;
+    obstacles.push({
+      x: dropX,
+      y: boss.y + boss.airOffset - 20,
+      w: 22, h: 34,
+      type: 'cone', mode: 'jump',
+      falling: true, vy: 0
+    });
+    Audio2.jumpSfx();
   }
 
   function defeatBoss() {
@@ -1775,9 +1846,23 @@
         obstacles.splice(i, 1);
         continue;
       }
-      // hauteur calculée au centre de l'obstacle (pas au bord gauche) pour que
-      // les rails larges restent bien centrés sur la pente, pieds compris
-      ob.y = groundYAt(ob.x + ob.w / 2) - ob.h;
+      if (ob.falling) {
+        // plot lâché par le boss en vol : tombe avec la gravité, pas de
+        // collision tant qu'il n'a pas touché le sol
+        ob.vy = (ob.vy || 0) + gravity * 0.9;
+        ob.y += ob.vy;
+        const landY = groundYAt(ob.x + ob.w / 2) - ob.h;
+        if (ob.y >= landY) {
+          ob.y = landY;
+          ob.falling = false;
+        } else {
+          continue;
+        }
+      } else {
+        // hauteur calculée au centre de l'obstacle (pas au bord gauche) pour que
+        // les rails larges restent bien centrés sur la pente, pieds compris
+        ob.y = groundYAt(ob.x + ob.w / 2) - ob.h;
+      }
 
       const obBox = { x: ob.x, y: ob.y, w: ob.w, h: ob.h };
 
@@ -1963,6 +2048,14 @@
   function drawObstacles() {
     for (const ob of obstacles) {
       if (ob.type === 'cone') {
+        if (ob.falling) {
+          // plot encore en chute depuis le boss : culbute légèrement dans les airs
+          ctx.save();
+          const ccx = ob.x + ob.w / 2, ccy = ob.y + ob.h / 2;
+          ctx.translate(ccx, ccy);
+          ctx.rotate((ob.vy || 0) * 0.15);
+          ctx.translate(-ccx, -ccy);
+        }
         ctx.fillStyle = '#ff7a1a';
         ctx.beginPath();
         ctx.moveTo(ob.x + ob.w / 2, ob.y);
@@ -1972,6 +2065,7 @@
         ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.fillRect(ob.x + 3, ob.y + ob.h * 0.55, ob.w - 6, 4);
+        if (ob.falling) ctx.restore();
       } else if (ob.type === 'rail') {
         const active = grinding === ob;
         let railColor = active ? '#ffd400' : '#7fffd4';
@@ -2046,27 +2140,37 @@
   // ---- Boss : un skate cabré, entouré de flammes, à 1000 PV ----
   function drawBoss() {
     if (!boss) return;
-    const bx = boss.x, by = boss.y + boss.bob;
+    const bx = boss.x, by = boss.y + boss.bob + boss.airOffset;
 
     ctx.save();
     ctx.translate(bx, by);
+    // légère bascule d'idle, plus prononcée pendant la phase aérienne pour
+    // vendre le fait qu'il s'envole/plane
+    const airTilt = boss.airOffset ? (boss.airOffset / BOSS_AIR_HEIGHT) * 0.2 : 0;
+    ctx.rotate(Math.sin(boss.flameFrame * 0.05) * 0.04 + airTilt);
 
-    // flammes tout autour, triangles animés qui tournent lentement
-    const flameCount = 10;
-    for (let i = 0; i < flameCount; i++) {
-      const ang = (i / flameCount) * Math.PI * 2 + boss.flameFrame * 0.05;
-      const wob = Math.sin(boss.flameFrame * 0.3 + i) * 3;
-      const r1 = 32 + wob;
-      const fx = Math.cos(ang) * r1;
-      const fy = Math.sin(ang) * r1 * 0.6 - 18;
-      const flameLen = 10 + Math.sin(boss.flameFrame * 0.4 + i * 1.3) * 5;
-      ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + Math.cos(ang) * flameLen, fy + Math.sin(ang) * flameLen * 0.6 - flameLen * 0.5);
-      ctx.lineTo(fx - Math.sin(ang) * 4, fy + Math.cos(ang) * 4);
-      ctx.closePath();
-      ctx.fill();
+    const deckW = 128, deckH = 11;
+    const wheelR = 13;
+    const wheelXs = [-deckW / 2 + 20, deckW / 2 - 20];
+    const wheelY = deckH / 2 + wheelR - 3;
+
+    // flammes qui jaillissent de chaque roue (pas une auréole générale : ça
+    // doit clairement lire comme "les roues sont en feu")
+    for (const wx of wheelXs) {
+      for (let i = 0; i < 5; i++) {
+        const ang = -Math.PI / 2 + (i - 2) * 0.55 + Math.sin(boss.flameFrame * 0.3 + i + wx) * 0.12;
+        const wob = Math.sin(boss.flameFrame * 0.4 + i * 1.7 + wx) * 2;
+        const len = wheelR + 6 + wob + i * 1.4;
+        const fx = wx + Math.cos(ang) * (wheelR - 3);
+        const fy = wheelY + Math.sin(ang) * (wheelR - 3);
+        ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+        ctx.lineTo(fx + Math.cos(ang + 0.35) * (len * 0.4), fy + Math.sin(ang + 0.35) * (len * 0.4));
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     // flash blanc au moment de l'impact
@@ -2074,69 +2178,103 @@
       ctx.globalAlpha = (boss.hitFlash / 8) * 0.6;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(0, -18, 40, 0, Math.PI * 2);
+      ctx.arc(0, -6, 50, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
     }
 
-    // corps du boss : une planche géante cabrée, avec un oeil menaçant
-    ctx.rotate(-0.15 + Math.sin(boss.flameFrame * 0.08) * 0.03);
-    const deckW = 90, deckH = 16;
+    // roues (sous le deck, comme la planche du joueur), avec une bordure
+    // incandescente pour bien lire "roues en feu" même sans les flammes
+    ctx.fillStyle = '#111';
+    for (const wx of wheelXs) {
+      ctx.beginPath();
+      ctx.arc(wx, wheelY, wheelR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#ff7a1a';
+    ctx.lineWidth = 2.5;
+    for (const wx of wheelXs) {
+      ctx.beginPath();
+      ctx.arc(wx, wheelY, wheelR - 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // trucks (attaches metal entre les roues et le deck)
+    ctx.fillStyle = '#9aa0a6';
+    for (const wx of wheelXs) {
+      ctx.fillRect(wx - 6, deckH / 2 - 2, 12, 6);
+    }
+
+    // deck plat avec kicktails avant/arrière, comme une vraie planche de skate
     ctx.fillStyle = '#111';
     ctx.beginPath();
     ctx.moveTo(-deckW / 2 + 6, deckH / 2);
-    ctx.lineTo(-deckW / 2, -deckH / 2 - 6);
-    ctx.lineTo(-deckW / 2 + 10, -deckH / 2 - 14);
-    ctx.lineTo(deckW / 2 - 10, -deckH / 2 - 14);
-    ctx.lineTo(deckW / 2, -deckH / 2 - 6);
+    ctx.lineTo(-deckW / 2, -deckH / 2 + 1);
+    ctx.lineTo(-deckW / 2 + 8, -deckH / 2 - 10);
+    ctx.lineTo(deckW / 2 - 8, -deckH / 2 - 10);
+    ctx.lineTo(deckW / 2, -deckH / 2 + 1);
     ctx.lineTo(deckW / 2 - 6, deckH / 2);
     ctx.closePath();
     ctx.fill();
 
     // grip tape
     ctx.fillStyle = '#2b2b2b';
-    ctx.fillRect(-deckW / 2 + 8, -deckH / 2 - 12, deckW - 16, 5);
+    ctx.fillRect(-deckW / 2 + 10, -deckH / 2 - 8, deckW - 20, 5);
 
-    // liseré de flammes peint sur la planche
+    // liseré de flamme peint sur la tranche du deck
     ctx.fillStyle = '#ff3b1a';
-    ctx.fillRect(-deckW / 2 + 6, deckH / 2 - 4, deckW - 12, 3);
+    ctx.fillRect(-deckW / 2 + 6, deckH / 2 - 3, deckW - 12, 3);
 
-    // roues
-    ctx.fillStyle = '#1a1a1a';
-    for (const wx of [-deckW / 2 + 14, deckW / 2 - 14]) {
-      ctx.beginPath();
-      ctx.arc(wx, deckH / 2 + 8, 9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // oeil menaçant au centre du deck
+    // oeil menaçant sur le kicktail avant
+    const eyeX = deckW / 2 - 20;
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.ellipse(0, -deckH / 2 - 3, 12, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(eyeX, -deckH / 2 - 5, 10, 7, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#c00';
     ctx.beginPath();
-    ctx.arc(Math.sin(boss.flameFrame * 0.15) * 3, -deckH / 2 - 3, 5, 0, Math.PI * 2);
+    ctx.arc(eyeX + Math.sin(boss.flameFrame * 0.15) * 3, -deckH / 2 - 5, 4, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
   }
 
-  // ---- Dents : petits projectiles envoyés sur le boss ----
+  // ---- Dents : petits projectiles en forme de canine, envoyés sur le boss ----
   function drawTeeth() {
     for (const t of teeth) {
       ctx.save();
       ctx.translate(t.x, t.y);
-      ctx.fillStyle = '#fff';
+
+      // légère traînée de vitesse derrière la dent
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-6, -4);
-      ctx.lineTo(6, 0);
-      ctx.lineTo(-6, 4);
+      ctx.moveTo(-15, 0);
+      ctx.lineTo(-5, 0);
+      ctx.stroke();
+
+      // dent : silhouette de canine (pointe vers l'avant, bords arrondis)
+      const grad = ctx.createLinearGradient(-8, -6, 9, 6);
+      grad.addColorStop(0, '#f3efe2');
+      grad.addColorStop(1, '#ffffff');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(9, 0);
+      ctx.quadraticCurveTo(2, -7, -8, -4);
+      ctx.quadraticCurveTo(-3, 0, -8, 4);
+      ctx.quadraticCurveTo(2, 7, 9, 0);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#c8c8c8';
-      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = '#c9c2a8';
+      ctx.lineWidth = 0.8;
       ctx.stroke();
+
+      // petit reflet pour donner du volume
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.ellipse(-2, -2.5, 2, 1, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
     }
   }
