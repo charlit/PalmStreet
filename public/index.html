@@ -117,6 +117,42 @@
     opacity: 1;
     transform: translate(-50%, 0) scale(1);
   }
+  #bossHud {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 78%;
+    max-width: 320px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    z-index: 40;
+    transition: opacity 0.25s ease;
+  }
+  #bossHud.show { opacity: 1; }
+  #bossHud .bossLabel {
+    color: #ff3b1a;
+    font-weight: bold;
+    font-size: clamp(11px, 2.8vw, 14px);
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(255,59,26,0.8);
+    margin-bottom: 3px;
+  }
+  #bossHud .bossBarOuter {
+    height: 10px;
+    border: 2px solid #ff7a1a;
+    border-radius: 5px;
+    background: rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  #bossHud .bossBarInner {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #ff3b1a, #ffd400);
+    transition: width 0.15s linear;
+  }
   #controlsHint {
     position: absolute;
     bottom: 8px;
@@ -390,6 +426,10 @@
   <div id="best">BEST 0</div>
   <div id="combo">COMBO x1</div>
   <div id="milestoneBanner"></div>
+  <div id="bossHud">
+    <div class="bossLabel">BOSS</div>
+    <div class="bossBarOuter"><div class="bossBarInner" id="bossBarInner"></div></div>
+  </div>
   <div id="controlsHint">TAP = OLLIE · DOUBLE TAP = FIGURE</div>
   <button id="btnMute" type="button">🔊</button>
   <canvas id="game" width="390" height="620"></canvas>
@@ -643,6 +683,8 @@
   const overlay = document.getElementById('overlay');
   const comboEl = document.getElementById('combo');
   const milestoneBanner = document.getElementById('milestoneBanner');
+  const bossHud = document.getElementById('bossHud');
+  const bossBarInner = document.getElementById('bossBarInner');
 
   function showMilestoneBanner(text, duration) {
     milestoneBanner.textContent = text;
@@ -827,6 +869,17 @@
   let landmarkCounter = 0;
   let bigRailThreshold = 0; // prochain seuil de score où le prochain rail sera le grand rail arc-en-ciel
   let flyingBoard = null; // planche qui s'échappe en rebondissant au moment du crash
+
+  // ---- Combat de boss : apparaît une seule fois par partie, à 15000 points ----
+  const BOSS_TRIGGER_SCORE = 15000;
+  const BOSS_MAX_HP = 1000;
+  const TOOTH_DAMAGE = 100;
+  const TOOTH_FIRE_INTERVAL = 22; // frames entre deux tirs de dents
+  let bossFightActive = false;
+  let bossDefeatedOnce = false; // empêche de redéclencher le combat après l'avoir gagné
+  let boss = null;   // { x, y, hp, maxHp, flameFrame, hitFlash, bob }
+  let teeth = [];    // projectiles envoyés sur le boss : { x, y, vx }
+  let toothCooldown = 0;
   let oceanScrollX1 = 0;
   let oceanScrollX2 = 0;
   let oceanScrollX3 = 0;
@@ -885,6 +938,8 @@
   // une interpolation en S (cosinus) : pente nulle à l'entrée et à la sortie
   // de chaque segment, donc des collines bien arrondies, jamais de cassure.
   function terrainInfoAt(worldX) {
+    // pendant le combat de boss, le sol redevient entièrement plat (pas de collines)
+    if (bossFightActive) return { elev: 0, kind: 'flat', t: 0 };
     for (let i = 0; i < terrainSegments.length; i++) {
       const s = terrainSegments[i];
       if (worldX <= s.end || i === terrainSegments.length - 1) {
@@ -1250,6 +1305,12 @@
     wheelSpinAngle = 0;
     bigRailThreshold = 0;
     flyingBoard = null;
+    bossFightActive = false;
+    bossDefeatedOnce = false;
+    boss = null;
+    teeth = [];
+    toothCooldown = 0;
+    bossHud.classList.remove('show');
     resetTerrain();
     ensureTerrainAhead(W + 150);
     player.y = groundYAt(player.x);
@@ -1320,11 +1381,101 @@
     Audio2.startMusic();
   }
 
+  // ---- Combat de boss : sol plat, plus d'obstacles, un skate enflammé à 1000 PV
+  // que le joueur canarde de dents jusqu'à la victoire ----
+  function triggerBossFight() {
+    bossFightActive = true;
+    obstacles = [];
+    coins = [];
+    grinding = null;
+    Audio2.stopGrindSfx();
+    boss = {
+      x: W - 90,
+      y: GROUND_Y,
+      hp: BOSS_MAX_HP,
+      maxHp: BOSS_MAX_HP,
+      flameFrame: 0,
+      hitFlash: 0,
+      bob: 0
+    };
+    teeth = [];
+    toothCooldown = 40; // laisse une petite respiration avant le premier tir
+    bossHud.classList.add('show');
+    bossBarInner.style.width = '100%';
+    showMilestoneBanner('BOSS !', 2200);
+  }
+
+  function updateBossFight() {
+    if (!boss) return;
+    boss.flameFrame++;
+    // le boss reste à distance devant le joueur (il "recule" au même rythme
+    // que le monde défile) avec un léger flottement, plutôt que de défiler
+    // comme un obstacle normal
+    const targetX = W - 90;
+    boss.x += (targetX - boss.x) * 0.04;
+    boss.bob = Math.sin(frame * 0.1) * 3;
+    if (boss.hitFlash > 0) boss.hitFlash--;
+
+    // tir automatique de dents sur le boss
+    toothCooldown--;
+    if (toothCooldown <= 0) {
+      teeth.push({ x: player.x + player.w, y: player.y - player.h * 0.55, vx: 7.5 });
+      toothCooldown = TOOTH_FIRE_INTERVAL;
+      Audio2.jumpSfx();
+    }
+
+    // avance des dents + collision avec le boss
+    const bossBox = { x: boss.x - 34, y: boss.y - 60 + boss.bob, w: 68, h: 60 };
+    for (let i = teeth.length - 1; i >= 0; i--) {
+      const t = teeth[i];
+      t.x += t.vx;
+      if (t.x >= bossBox.x && t.x <= bossBox.x + bossBox.w &&
+          t.y >= bossBox.y && t.y <= bossBox.y + bossBox.h) {
+        teeth.splice(i, 1);
+        boss.hp = Math.max(0, boss.hp - TOOTH_DAMAGE);
+        boss.hitFlash = 8;
+        boss.x += 6; // petit recul à l'impact
+        bossBarInner.style.width = Math.max(0, (boss.hp / boss.maxHp) * 100) + '%';
+        Audio2.coinSfx();
+        for (let k = 0; k < 6; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          particles.push({ x: t.x, y: t.y, life: 14, vy: Math.sin(ang) * 1.5, vx: Math.cos(ang) * 1.5, color: '#ff7a1a' });
+        }
+        if (boss.hp <= 0) { defeatBoss(); return; }
+        continue;
+      }
+      if (t.x > W + 20) teeth.splice(i, 1);
+    }
+  }
+
+  function defeatBoss() {
+    bossFightActive = false;
+    bossDefeatedOnce = true;
+    bossHud.classList.remove('show');
+    const bonus = 5000;
+    score += bonus;
+    addFloatingText('+' + bonus + ' BOSS VAINCU !', player.x, player.y - player.h - 20, '#ffd400');
+    showMilestoneBanner('BOSS VAINCU !', 2600);
+    Audio2.trickSfx();
+    for (let k = 0; k < 26; k++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 1.5 + Math.random() * 3;
+      particles.push({
+        x: boss.x, y: boss.y - 30, life: 32,
+        vy: Math.sin(ang) * spd, vx: Math.cos(ang) * spd,
+        color: k % 2 === 0 ? '#ff7a1a' : '#ffd400'
+      });
+    }
+    boss = null;
+    teeth = [];
+  }
+
   function gameOver() {
     state = 'over';
     Audio2.stopGrindSfx();
     Audio2.stopMusic();
     Audio2.crashSfx();
+    bossHud.classList.remove('show');
 
     // la planche s'échappe sous les pieds et part rebondir plus loin
     flyingBoard = {
@@ -1479,6 +1630,12 @@
   function update() {
     frame++;
     score += 1;
+
+    // déclenche le combat de boss une seule fois, au premier passage des 15000 points
+    if (!bossFightActive && !bossDefeatedOnce && score >= BOSS_TRIGGER_SCORE) {
+      triggerBossFight();
+    }
+
     speed = Math.min(maxSpeed, baseSpeed + Math.floor(score / speedStepScore) * speedStep);
 
     // relief : vitesse boostée en descente, un peu réduite en montée
@@ -1580,19 +1737,24 @@
     // spawn : un seul timer partagé entre obstacles et pièces, avec une marge
     // calculée pour que le prochain élément n'apparaisse jamais avant que
     // le précédent ait totalement dégagé la place (donc jamais superposés).
-    nextSpawnIn--;
-    if (nextSpawnIn <= 0) {
-      // pas de plot (ni de rail) dans une montée : uniquement des pièces,
-      // les obstacles n'apparaissent que sur le plat ou en descente
-      const uphillHere = terrainInfoAt(spawnPointWorldX()).kind === 'up';
-      const spawnCoinsThisTime = uphillHere || Math.random() < 0.38;
-      const widthJustSpawned = spawnCoinsThisTime ? spawnCoinRow() : spawnObstacle();
+    // Suspendu pendant le combat de boss : plus aucun obstacle ni pièce.
+    if (!bossFightActive) {
+      nextSpawnIn--;
+      if (nextSpawnIn <= 0) {
+        // pas de plot (ni de rail) dans une montée : uniquement des pièces,
+        // les obstacles n'apparaissent que sur le plat ou en descente
+        const uphillHere = terrainInfoAt(spawnPointWorldX()).kind === 'up';
+        const spawnCoinsThisTime = uphillHere || Math.random() < 0.38;
+        const widthJustSpawned = spawnCoinsThisTime ? spawnCoinRow() : spawnObstacle();
 
-      const safetyMarginPx = 55; // marge de sécurité en pixels entre deux éléments
-      const framesToClear = (widthJustSpawned + safetyMarginPx) / Math.max(speed, 0.1);
-      // un peu plus d'air entre les éléments pendant la phase d'échauffement (< 2000 pts)
-      const extraGapFrames = (score < 2000 ? 45 : 25) + Math.random() * 55;
-      nextSpawnIn = framesToClear + extraGapFrames;
+        const safetyMarginPx = 55; // marge de sécurité en pixels entre deux éléments
+        const framesToClear = (widthJustSpawned + safetyMarginPx) / Math.max(speed, 0.1);
+        // un peu plus d'air entre les éléments pendant la phase d'échauffement (< 2000 pts)
+        const extraGapFrames = (score < 2000 ? 45 : 25) + Math.random() * 55;
+        nextSpawnIn = framesToClear + extraGapFrames;
+      }
+    } else {
+      updateBossFight();
     }
 
     // move obstacles + collisions
@@ -1881,6 +2043,104 @@
     }
   }
 
+  // ---- Boss : un skate cabré, entouré de flammes, à 1000 PV ----
+  function drawBoss() {
+    if (!boss) return;
+    const bx = boss.x, by = boss.y + boss.bob;
+
+    ctx.save();
+    ctx.translate(bx, by);
+
+    // flammes tout autour, triangles animés qui tournent lentement
+    const flameCount = 10;
+    for (let i = 0; i < flameCount; i++) {
+      const ang = (i / flameCount) * Math.PI * 2 + boss.flameFrame * 0.05;
+      const wob = Math.sin(boss.flameFrame * 0.3 + i) * 3;
+      const r1 = 32 + wob;
+      const fx = Math.cos(ang) * r1;
+      const fy = Math.sin(ang) * r1 * 0.6 - 18;
+      const flameLen = 10 + Math.sin(boss.flameFrame * 0.4 + i * 1.3) * 5;
+      ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx + Math.cos(ang) * flameLen, fy + Math.sin(ang) * flameLen * 0.6 - flameLen * 0.5);
+      ctx.lineTo(fx - Math.sin(ang) * 4, fy + Math.cos(ang) * 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // flash blanc au moment de l'impact
+    if (boss.hitFlash > 0) {
+      ctx.globalAlpha = (boss.hitFlash / 8) * 0.6;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(0, -18, 40, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // corps du boss : une planche géante cabrée, avec un oeil menaçant
+    ctx.rotate(-0.15 + Math.sin(boss.flameFrame * 0.08) * 0.03);
+    const deckW = 90, deckH = 16;
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.moveTo(-deckW / 2 + 6, deckH / 2);
+    ctx.lineTo(-deckW / 2, -deckH / 2 - 6);
+    ctx.lineTo(-deckW / 2 + 10, -deckH / 2 - 14);
+    ctx.lineTo(deckW / 2 - 10, -deckH / 2 - 14);
+    ctx.lineTo(deckW / 2, -deckH / 2 - 6);
+    ctx.lineTo(deckW / 2 - 6, deckH / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // grip tape
+    ctx.fillStyle = '#2b2b2b';
+    ctx.fillRect(-deckW / 2 + 8, -deckH / 2 - 12, deckW - 16, 5);
+
+    // liseré de flammes peint sur la planche
+    ctx.fillStyle = '#ff3b1a';
+    ctx.fillRect(-deckW / 2 + 6, deckH / 2 - 4, deckW - 12, 3);
+
+    // roues
+    ctx.fillStyle = '#1a1a1a';
+    for (const wx of [-deckW / 2 + 14, deckW / 2 - 14]) {
+      ctx.beginPath();
+      ctx.arc(wx, deckH / 2 + 8, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // oeil menaçant au centre du deck
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(0, -deckH / 2 - 3, 12, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c00';
+    ctx.beginPath();
+    ctx.arc(Math.sin(boss.flameFrame * 0.15) * 3, -deckH / 2 - 3, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ---- Dents : petits projectiles envoyés sur le boss ----
+  function drawTeeth() {
+    for (const t of teeth) {
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(-6, -4);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(-6, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#c8c8c8';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function drawPlayer() {
     ctx.save();
     const drawH = player.h + 10;
@@ -2085,7 +2345,9 @@
     drawParticles();
     drawCoins();
     drawObstacles();
+    drawBoss();
     drawPlayer();
+    drawTeeth();
     drawFlyingBoard();
     drawFloatingTexts();
 
