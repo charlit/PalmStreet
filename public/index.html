@@ -2549,26 +2549,52 @@
   // navigateurs) ; sinon on retombe sur touchstart/touchend, utile pour un
   // navigateur intégré (Instagram, TikTok...) qui les gérerait mal.
   // (on ne branche JAMAIS les deux à la fois, sinon un seul tap se compterait deux fois)
+  // ---- Raccourci caché : cliquer sur le soleil (écran d'accueil) saute direct
+  // au combat de boss, à 15000 points, avec Freestyle ----
+  function isSunClick(e) {
+    if (state !== 'ready') return false;
+    const touch = e.touches && e.touches[0];
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
+    if (clientX == null || clientY == null) return false;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const cx = (clientX - rect.left) * scaleX;
+    const cy = (clientY - rect.top) * scaleY;
+    const sunX = W - 55, sunY = H * 0.10, hitR = 24 + 16; // marge tactile généreuse
+    const dx = cx - sunX, dy = cy - sunY;
+    return (dx * dx + dy * dy) <= hitR * hitR;
+  }
+
+  function triggerBossShortcut() {
+    document.querySelectorAll('.charCard').forEach((c) => c.classList.remove('selected'));
+    const freestyleCard = document.getElementById('charCardFreestyle');
+    if (freestyleCard) freestyleCard.classList.add('selected');
+    selectedCharacter = 'freestyle';
+    charImg.src = CHAR_SPRITES.freestyle;
+    startGame();
+    score = 15000;
+    triggerBossFight();
+  }
+
+  function handleOverlayTap(e) {
+    if (e.cancelable) e.preventDefault();
+    if (isSunClick(e)) { triggerBossShortcut(); return; }
+    jump();
+  }
+
   if (window.PointerEvent) {
     canvas.addEventListener('pointerdown', handleTapStart);
     canvas.addEventListener('pointerup', handleTapEnd);
-    overlay.addEventListener('pointerdown', (e) => {
-      if (e.cancelable) e.preventDefault();
-      jump();
-    });
+    overlay.addEventListener('pointerdown', handleOverlayTap);
   } else {
     canvas.addEventListener('touchstart', handleTapStart, { passive: false });
     canvas.addEventListener('touchend', handleTapEnd);
     canvas.addEventListener('mousedown', handleTapStart);
     canvas.addEventListener('mouseup', handleTapEnd);
-    overlay.addEventListener('touchstart', (e) => {
-      if (e.cancelable) e.preventDefault();
-      jump();
-    }, { passive: false });
-    overlay.addEventListener('mousedown', (e) => {
-      if (e.cancelable) e.preventDefault();
-      jump();
-    });
+    overlay.addEventListener('touchstart', handleOverlayTap, { passive: false });
+    overlay.addEventListener('mousedown', handleOverlayTap);
   }
 
   requestAnimationFrame(loop);
