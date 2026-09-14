@@ -1002,7 +1002,7 @@
   let canTrick = true;      // un seul trick par saut
   let trick = null;         // { kind, elapsed, duration } - figure en cours d'animation
   let trickCycleIndex = 0;  // pour alterner entre les figures à chaque fois
-  const TRICK_KINDS = ['kickflip', 'shuvit', 'threesixty'];
+  const TRICK_KINDS = ['kickflip', 'shuvit', 'threesixty', 'threesixtyrev'];
   let landTimer = 0;        // pour l'effet d'ecrasement a l'atterrissage
   let milestoneNextThreshold = 5000; // prochain palier de score où afficher le bandeau FULL SPEED
 
@@ -1370,14 +1370,14 @@
     const kind = TRICK_KINDS[trickCycleIndex % TRICK_KINDS.length];
     trickCycleIndex++;
 
-    const rewards = { kickflip: 30, shuvit: 35, threesixty: 45 };
-    const labels = { kickflip: 'FLIP !', shuvit: 'SHOVE-IT !', threesixty: '360° !' };
+    const rewards = { kickflip: 30, shuvit: 35, threesixty: 45, threesixtyrev: 45 };
+    const labels = { kickflip: 'FLIP !', shuvit: 'SHOVE-IT !', threesixty: '360° !', threesixtyrev: '360° INVERSÉ !' };
     const pts = rewards[kind] * combo;
     score += pts;
     bumpCombo();
     Audio2.trickSfx();
 
-    trick = { kind, elapsed: 0, duration: kind === 'threesixty' ? 30 : 22 };
+    trick = { kind, elapsed: 0, duration: (kind === 'threesixty' || kind === 'threesixtyrev') ? 30 : 22 };
     addFloatingText('+' + pts + ' ' + labels[kind], player.x, player.y - player.h - 10, '#ffd400');
   }
 
@@ -2308,9 +2308,12 @@
       bobY = -Math.abs(bob) * 2;
     }
 
-    // le 360 fait tourner le personnage ET la planche ensemble ; flip/shove-it ne touchent que la planche
+    // les deux 360 font tourner le personnage ET la planche ensemble (sens opposés
+    // l'un de l'autre) ; flip/shove-it ne touchent que la planche
     const trickProgress = trick ? trick.elapsed / trick.duration : 0;
-    const bodySpin = (trick && trick.kind === 'threesixty') ? trickProgress * Math.PI * 2 : 0;
+    let bodySpin = 0;
+    if (trick && trick.kind === 'threesixty') bodySpin = trickProgress * Math.PI * 2;
+    else if (trick && trick.kind === 'threesixtyrev') bodySpin = -trickProgress * Math.PI * 2;
 
     if (airborne) {
       // pivot au centre pour les rotations aeriennes (tricks)
