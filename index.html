@@ -878,10 +878,10 @@
   // phase aérienne : toutes les ~10s le boss s'envole et lâche des plots
   const BOSS_PHASE_INTERVAL = 600;  // frames au sol avant le prochain envol (~10s à 60fps)
   const BOSS_RISE_FRAMES = 30;
-  const BOSS_HOVER_FRAMES = 150;
+  const BOSS_HOVER_FRAMES = 220;
   const BOSS_DESCEND_FRAMES = 30;
   const BOSS_AIR_HEIGHT = 150;
-  const BOSS_DROP_INTERVAL = 35;    // frames entre deux plots lâchés pendant l'envol
+  const BOSS_DROP_INTERVAL = 55;    // frames entre deux plots lâchés pendant l'envol
   const BOSS_DROP_COUNT = 4;        // nombre de plots lâchés par envol
   let bossFightActive = false;
   let bossDefeatedOnce = false; // empêche de redéclencher le combat après l'avoir gagné
@@ -1446,7 +1446,7 @@
         boss.phase = 'airborne';
         boss.phaseElapsed = 0;
         boss.dropsDone = 0;
-        boss.dropTimer = 20; // petit délai avant le premier plot lâché
+        boss.dropTimer = 30; // petit délai avant le premier plot lâché
       }
     } else if (boss.phase === 'airborne') {
       boss.phaseElapsed++;
