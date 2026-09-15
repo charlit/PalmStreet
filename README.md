@@ -11,33 +11,32 @@ internet ni ouvrir de port.
 ## Contenu du dossier
 
 ```
-palmstreet-selfhost/
+PalmStreet/
 ├── server.js          <- remplace scores.js + visits.js de Netlify
 ├── package.json
 ├── Dockerfile
 ├── docker-compose.yml
+├── index.html          <- ton jeu (copie identique servie par server.js via public/)
 ├── public/
-│   └── index.html     <- ton jeu
+│   └── index.html     <- copie servie en prod, à garder synchro avec celle-ci
 └── data/              <- créé automatiquement, contient scores.json et visits.json
 ```
 
-## 1. Transférer ce dossier sur le Mac mini
+## 1. Cloner le dépôt sur le Mac mini
 
-Depuis ton ordinateur habituel, envoie tout le dossier `palmstreet-selfhost`
-sur le Mac mini. Le plus simple avec ton setup existant (SSH configuré) :
+Connecte-toi en SSH sur le Mac mini et clone le dépôt GitHub (une seule
+fois — les mises à jour suivantes se font avec `git pull`, voir section 6) :
 
 ```
-scp -r palmstreet-selfhost jussan@mac-mini-de-jussan.tail736807.ts.net:~/
+ssh jussan@games-carlitos.tail736807.ts.net
+git clone https://github.com/charlit/PalmStreet.git
 ```
-
-(ou glisse le dossier via Partage d'écran/VNC si tu préfères une méthode
-avec interface graphique)
 
 ## 2. Se connecter au Mac mini et changer le mot de passe des visites
 
 ```
-ssh jussan@mac-mini-de-jussan.tail736807.ts.net
-cd palmstreet-selfhost
+ssh jussan@games-carlitos.tail736807.ts.net
+cd PalmStreet
 nano docker-compose.yml
 ```
 
@@ -50,7 +49,7 @@ Toujours connecté en SSH sur le Mac mini :
 
 ```
 colima start --vm-type=vz   # si Colima n'est pas déjà démarré
-cd palmstreet-selfhost
+cd PalmStreet
 docker compose up -d --build
 ```
 
@@ -77,7 +76,7 @@ sudo tailscale funnel --bg 8082
 
 Tailscale affiche alors une URL publique du style :
 ```
-https://mac-mini-de-jussan.tail736807.ts.net/
+https://games-carlitos.tail736807.ts.net/
 ```
 
 **C'est cette adresse que tu partages** — n'importe qui peut l'ouvrir et
@@ -99,19 +98,24 @@ sudo tailscale funnel --bg off
 - Le jeu n'est en ligne que si **le Mac mini est allumé et connecté** —
   contrairement à Netlify qui reste toujours actif sur ses serveurs.
 - `docker compose logs -f` remplace les logs de fonctions Netlify.
-- Les scores et visites sont dans `palmstreet-selfhost/data/scores.json`
+- Les scores et visites sont dans `PalmStreet/data/scores.json`
   et `visits.json` — tu peux les ouvrir avec `cat data/scores.json` ou
   les éditer/sauvegarder comme n'importe quel fichier.
 - Pour consulter les visites : `https://TON_URL_FUNNEL/api/visits?key=TON_MOT_DE_PASSE`
 
 ## 6. Mettre à jour le jeu plus tard
 
-Quand je te donne une nouvelle version du fichier `index.html` :
+Quand une nouvelle version est disponible sur GitHub (nouveau personnage,
+figure, combat de boss, etc.), connecte-toi en SSH sur le Mac mini et :
 
 ```
-scp index.html jussan@mac-mini-de-jussan.tail736807.ts.net:~/palmstreet-selfhost/public/index.html
-ssh jussan@mac-mini-de-jussan.tail736807.ts.net "cd palmstreet-selfhost && docker compose restart"
+cd PalmStreet
+git pull
+docker-compose up -d --build
 ```
+
+`docker-compose up -d --build` reconstruit l'image avec le nouveau code et
+redémarre le conteneur — pas besoin de `docker compose restart` séparément.
 
 ## 7. Démarrage automatique au redémarrage du Mac mini
 
