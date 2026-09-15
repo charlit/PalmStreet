@@ -44,6 +44,8 @@ app.get('/api/scores', (req, res) => {
   res.json(list);
 });
 
+const VALID_CHARACTERS = ['freestyle', 'keketsk8', 'guigui', 'maxwell'];
+
 app.post('/api/scores', (req, res) => {
   let name = String((req.body && req.body.name) || 'Anonyme').trim().slice(0, 14);
   if (!name) name = 'Anonyme';
@@ -51,8 +53,10 @@ app.post('/api/scores', (req, res) => {
   if (!Number.isFinite(score) || score < 0 || score > MAX_SCORE_VALUE) {
     return res.status(400).json({ error: 'invalid score' });
   }
+  const rawCharacter = String((req.body && req.body.character) || '').trim().toLowerCase();
+  const character = VALID_CHARACTERS.includes(rawCharacter) ? rawCharacter : 'freestyle';
   let list = readJson(SCORES_FILE, []);
-  list.push({ name, score, date: Date.now() });
+  list.push({ name, score, character, date: Date.now() });
   list.sort((a, b) => b.score - a.score);
   list = list.slice(0, MAX_SCORES);
   writeJson(SCORES_FILE, list);
