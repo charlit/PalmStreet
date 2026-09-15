@@ -375,8 +375,8 @@
     box-shadow: 0 0 24px rgba(255,122,26,0.5);
     border-radius: 10px;
     padding: 18px 22px;
-    width: 260px;
-    max-width: 82vw;
+    width: 290px;
+    max-width: 86vw;
     max-height: 80vh;
     overflow-y: auto;
     text-align: center;
@@ -400,6 +400,13 @@
     border-bottom: 1px solid rgba(255,255,255,0.12);
   }
   .lbList li .lbRank { color: #ffd400; font-weight: bold; width: 22px; text-align: left; }
+  .lbList li .lbCharIcon {
+    width: 14px;
+    height: 24px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+    -webkit-user-drag: none;
+  }
   .lbList li .lbName { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lbList li .lbScore { color: #7fffd4; font-weight: bold; }
   #btnCloseLb {
@@ -727,12 +734,12 @@
     }
   }
 
-  async function submitScore(name, scoreValue) {
+  async function submitScore(name, scoreValue, character) {
     try {
       const res = await fetch(SCORES_API, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, score: scoreValue })
+        body: JSON.stringify({ name, score: scoreValue, character })
       });
       if (!res.ok) return null;
       return await res.json();
@@ -753,7 +760,10 @@
     }
     const items = list.slice(0, 10).map((entry, i) => {
       const safeName = String(entry.name || '???').slice(0, 14);
+      const charKey = CHAR_SPRITES[entry.character] ? entry.character : 'freestyle';
+      const charIcon = '<img class="lbCharIcon" src="' + CHAR_SPRITES[charKey] + '" alt="' + charKey + '">';
       return '<li><span class="lbRank">#' + (i + 1) + '</span>' +
+             charIcon +
              '<span class="lbName">' + escapeHtml(safeName) + '</span>' +
              '<span class="lbScore">' + Math.floor(entry.score) + '</span></li>';
     }).join('');
@@ -1593,7 +1603,7 @@
       if (!name) name = 'Anonyme';
       btn.disabled = true;
       statusEl.textContent = 'Enregistrement...';
-      const result = await submitScore(name, finalScore);
+      const result = await submitScore(name, finalScore, selectedCharacter);
       if (result) {
         statusEl.textContent = 'Score enregistré !';
       } else {
