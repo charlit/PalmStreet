@@ -1634,6 +1634,18 @@
     return totalDistance + (W + 20 - player.x);
   }
 
+  // Vrai si worldX tombe tout au début d'une descente (à moins de
+  // DESCENT_OBSTACLE_BUFFER du début de la pente) : le joueur vient tout juste
+  // d'accélérer, pas encore le temps de réagir, donc pas de plot/rail ici.
+  const DESCENT_OBSTACLE_BUFFER = 90;
+  function tooEarlyInDescent(worldX) {
+    for (const s of terrainSegments) {
+      if (worldX < s.start || worldX > s.end) continue;
+      return s.kind === 'down' && (worldX - s.start) < DESCENT_OBSTACLE_BUFFER;
+    }
+    return false;
+  }
+
   // ---- Obstacles : cônes et rails (à sauter ou grinder) ----
   function spawnObstacle() {
     // position (en distance monde) où l'obstacle apparaît, pour tester le relief à cet endroit
@@ -1812,10 +1824,13 @@
     if (!bossFightActive) {
       nextSpawnIn--;
       if (nextSpawnIn <= 0) {
-        // pas de plot (ni de rail) dans une montée : uniquement des pièces,
-        // les obstacles n'apparaissent que sur le plat ou en descente
-        const uphillHere = terrainInfoAt(spawnPointWorldX()).kind === 'up';
-        const spawnCoinsThisTime = uphillHere || Math.random() < 0.38;
+        // pas de plot (ni de rail) dans une montée, ni tout au début d'une
+        // descente (le temps de réagir à la vitesse qui vient d'augmenter) :
+        // uniquement des pièces dans ces cas-là
+        const spawnPos = spawnPointWorldX();
+        const uphillHere = terrainInfoAt(spawnPos).kind === 'up';
+        const earlyDescentHere = tooEarlyInDescent(spawnPos);
+        const spawnCoinsThisTime = uphillHere || earlyDescentHere || Math.random() < 0.38;
         const widthJustSpawned = spawnCoinsThisTime ? spawnCoinRow() : spawnObstacle();
 
         const safetyMarginPx = 55; // marge de sécurité en pixels entre deux éléments
