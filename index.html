@@ -1522,11 +1522,8 @@
   function defeatBoss() {
     bossFightActive = false;
     bossDefeatedOnce = true;
-    bossHud.classList.remove('show');
     const bonus = 5000;
     score += bonus;
-    addFloatingText('+' + bonus + ' BOSS VAINCU !', player.x, player.y - player.h - 20, '#ffd400');
-    showMilestoneBanner('BOSS VAINCU !', 2600);
     Audio2.trickSfx();
     for (let k = 0; k < 26; k++) {
       const ang = Math.random() * Math.PI * 2;
@@ -1539,26 +1536,18 @@
     }
     boss = null;
     teeth = [];
+    // vaincre le boss termine la partie sur un écran de victoire dédié,
+    // avec le même formulaire d'enregistrement de score que le game over
+    showEndScreen('TU ES UN VRAI PST !');
   }
 
-  function gameOver() {
+  // Écran de fin partagé (défaite ou victoire sur le boss) : affiche le score,
+  // met à jour le meilleur score, et propose le formulaire d'enregistrement.
+  function showEndScreen(title) {
     state = 'over';
     Audio2.stopGrindSfx();
     Audio2.stopMusic();
-    Audio2.crashSfx();
     bossHud.classList.remove('show');
-
-    // la planche s'échappe sous les pieds et part rebondir plus loin
-    flyingBoard = {
-      x: player.x,
-      y: player.y - 6,
-      rot: 0,
-      vx: -(speed + 3.5),
-      vy: -7.5,
-      spin: 0.4 + Math.random() * 0.2,
-      bounces: 0,
-      settled: false
-    };
 
     if (score > best) {
       best = score;
@@ -1567,7 +1556,7 @@
     }
     const finalScore = score;
     overlay.innerHTML =
-      '<div class="go">WIPEOUT !</div>' +
+      '<div class="go">' + title + '</div>' +
       '<p>Score : ' + finalScore + '</p>' +
       '<div id="scoreSaveArea">' +
         '<input id="pseudoField" type="text" maxlength="14" placeholder="Ton pseudo (optionnel)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="pseudoField_no_autofill">' +
@@ -1612,6 +1601,24 @@
         btn.disabled = false;
       }
     });
+  }
+
+  function gameOver() {
+    Audio2.crashSfx();
+
+    // la planche s'échappe sous les pieds et part rebondir plus loin
+    flyingBoard = {
+      x: player.x,
+      y: player.y - 6,
+      rot: 0,
+      vx: -(speed + 3.5),
+      vy: -7.5,
+      spin: 0.4 + Math.random() * 0.2,
+      bounces: 0,
+      settled: false
+    };
+
+    showEndScreen('WIPEOUT !');
   }
 
   // Vrai si tout l'intervalle de terrain [worldStart, worldEnd] (+ marge de
