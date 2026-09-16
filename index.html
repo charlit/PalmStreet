@@ -890,7 +890,7 @@
   const BOSS_RISE_FRAMES = 30;
   const BOSS_HOVER_FRAMES = 220;
   const BOSS_DESCEND_FRAMES = 30;
-  const BOSS_AIR_HEIGHT = 150;
+  const BOSS_AIR_HEIGHT = 230;
   const BOSS_DROP_INTERVAL = 55;    // frames entre deux plots lâchés pendant l'envol
   const BOSS_DROP_COUNT = 4;        // nombre de plots lâchés par envol
   let bossFightActive = false;
@@ -1518,7 +1518,9 @@
   // ---- Plot lâché par le boss depuis les airs : chute puis se comporte comme
   // un obstacle normal (à sauter) une fois au sol ----
   function dropBossCone() {
-    const dropX = boss.x + (Math.random() - 0.5) * 60;
+    // centré sous le boss (boss.x est le centre, dropX est le coin gauche du
+    // plot) avec une petite variation pour ne pas être parfaitement aligné
+    const dropX = boss.x - 11 + (Math.random() - 0.5) * 20;
     obstacles.push({
       x: dropX,
       y: boss.y + boss.airOffset - 20,
