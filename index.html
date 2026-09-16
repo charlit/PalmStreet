@@ -995,7 +995,8 @@
     vy: 0,
     ducking: false,
     onGround: true,
-    tilt: 0
+    tilt: 0,
+    airFrames: 0
   };
   const JUMP_V = -9.6;
 
@@ -1808,15 +1809,18 @@
     } else if (!player.onGround) {
       player.vy += gravity;
       player.y += player.vy;
+      player.airFrames++;
       if (player.y >= groundHere) {
         player.y = groundHere;
         player.vy = 0;
         player.onGround = true;
+        player.airFrames = 0;
         canTrick = true;
         landTimer = 10;
       }
     } else {
       player.y = groundHere;
+      player.airFrames = 0;
     }
     player.tilt = player.vy * 1.1;
     if (landTimer > 0) landTimer--;
@@ -2429,6 +2433,170 @@
     }
   }
 
+  // ---- Squelette articulé de Freestill (cinématique inverse), remplace le
+  // sprite bitmap plat pour ce personnage. Les cycles de pose ci-dessous
+  // sont repris tels quels du design "Skateur articulé" fourni par l'user. ----
+  const RIG_L = { torso: 42, armU: 22, armL: 20, thigh: 28, shin: 26, foot: 13 };
+  const RIG_BASE_Y = 258, RIG_DECK_Y = 300, RIG_KNEE = -1;
+  const RIG_CYCLES = {
+    'Poussée': [
+      { t: 0, torso: -80, aNU: 38, aNL: 6, aFU: 148, aFL: 178, pdx: -4, rdy: 2, bdx: 0, bdy: 0, ba: 0, fnx: 22, fny: -2, fna: 0, ffx: -34, ffy: -14, ffa: -16 },
+      { t: 0.25, torso: -71, aNU: 6, aNL: -26, aFU: 168, aFL: 202, pdx: -9, rdy: -2, bdx: 0, bdy: 0, ba: 0, fnx: 22, fny: -2, fna: 0, ffx: -70, ffy: 14, ffa: 6 },
+      { t: 0.5, torso: -86, aNU: 58, aNL: 34, aFU: 124, aFL: 144, pdx: 0, rdy: 8, bdx: 0, bdy: 0, ba: 0, fnx: 22, fny: -2, fna: 0, ffx: -80, ffy: 21, ffa: 0 },
+      { t: 0.75, torso: -76, aNU: 26, aNL: -6, aFU: 154, aFL: 184, pdx: -5, rdy: 0, bdx: 0, bdy: 0, ba: 0, fnx: 22, fny: -2, fna: 0, ffx: -14, ffy: 4, ffa: -18 }
+    ],
+    'Cruise': [
+      { t: 0, torso: -85, aNU: 28, aNL: 8, aFU: 152, aFL: 174, pdx: -2, rdy: 0, bdx: 0, bdy: 0, ba: 0, fnx: 24, fny: -2, fna: 0, ffx: -26, ffy: -2, ffa: 0 },
+      { t: 0.5, torso: -79, aNU: 44, aNL: 24, aFU: 138, aFL: 158, pdx: -4, rdy: 9, bdx: 0, bdy: 0, ba: 0, fnx: 24, fny: -2, fna: 0, ffx: -26, ffy: -2, ffa: 0 }
+    ],
+    'Ollie': [
+      { t: 0, torso: -74, aNU: 48, aNL: 26, aFU: 134, aFL: 150, pdx: -2, rdy: 12, bdx: 0, bdy: 0, ba: 0, fnx: 20, fny: -2, fna: 0, ffx: -30, ffy: -2, ffa: 0 },
+      { t: 0.22, torso: -88, aNU: 10, aNL: -16, aFU: 170, aFL: 196, pdx: 0, rdy: 2, bdx: 0, bdy: -14, ba: -26, fnx: 18, fny: -4, fna: 0, ffx: -30, ffy: -2, ffa: 0 },
+      { t: 0.45, torso: -80, aNU: 22, aNL: -6, aFU: 158, aFL: 184, pdx: 2, rdy: -20, bdx: 6, bdy: -28, ba: -10, fnx: 22, fny: -4, fna: 0, ffx: -26, ffy: -4, ffa: 0 },
+      { t: 0.68, torso: -84, aNU: 34, aNL: 8, aFU: 146, aFL: 170, pdx: 0, rdy: -12, bdx: 4, bdy: -16, ba: 8, fnx: 24, fny: -3, fna: 0, ffx: -26, ffy: -3, ffa: 0 },
+      { t: 0.86, torso: -70, aNU: 56, aNL: 34, aFU: 128, aFL: 142, pdx: -2, rdy: 14, bdx: 0, bdy: 0, ba: 2, fnx: 20, fny: -2, fna: 0, ffx: -30, ffy: -2, ffa: 0 }
+    ],
+    'Flip': [
+      { t: 0, torso: -74, aNU: 48, aNL: 26, aFU: 134, aFL: 150, pdx: -2, rdy: 12, bdx: 0, bdy: 0, ba: 0, fnx: 18, fny: -2, fna: 0, ffx: -30, ffy: -2, ffa: 0 },
+      { t: 0.18, torso: -90, aNU: 4, aNL: -22, aFU: 172, aFL: 200, pdx: 0, rdy: -2, bdx: 0, bdy: -14, ba: -26, fnx: 28, fny: -14, fna: -26, ffx: -30, ffy: -2, ffa: 0 },
+      { t: 0.42, torso: -84, aNU: 24, aNL: -4, aFU: 158, aFL: 186, pdx: 3, rdy: -22, bdx: 6, bdy: -26, ba: -6, fnx: 31, fny: -27, fna: -12, ffx: -21, ffy: -25, ffa: -8 },
+      { t: 0.66, torso: -86, aNU: 34, aNL: 8, aFU: 146, aFL: 172, pdx: 0, rdy: -16, bdx: 4, bdy: -20, ba: 2, fnx: 26, fny: -14, fna: 0, ffx: -26, ffy: -13, ffa: 0 },
+      { t: 0.84, torso: -80, aNU: 42, aNL: 16, aFU: 140, aFL: 162, pdx: -1, rdy: -3, bdx: 1, bdy: -6, ba: 0, fnx: 20, fny: -3, fna: 0, ffx: -29, ffy: -3, ffa: 0 }
+    ],
+    'Pop shove-it': [
+      { t: 0, torso: -74, aNU: 48, aNL: 26, aFU: 134, aFL: 150, pdx: -2, rdy: 12, bdx: 0, bdy: 0, ba: 0, fnx: 18, fny: -2, fna: 0, ffx: -30, ffy: -2, ffa: 0 },
+      { t: 0.18, torso: -88, aNU: 8, aNL: -18, aFU: 168, aFL: 196, pdx: 0, rdy: -2, bdx: 0, bdy: -13, ba: -22, fnx: 22, fny: -17, fna: -14, ffx: -39, ffy: 3, ffa: 16 },
+      { t: 0.42, torso: -84, aNU: 22, aNL: -6, aFU: 158, aFL: 184, pdx: 2, rdy: -20, bdx: 4, bdy: -24, ba: -4, fnx: 25, fny: -25, fna: -8, ffx: -24, ffy: -23, ffa: -4 },
+      { t: 0.66, torso: -86, aNU: 32, aNL: 6, aFU: 148, aFL: 174, pdx: 0, rdy: -14, bdx: 3, bdy: -18, ba: 2, fnx: 22, fny: -15, fna: 0, ffx: -26, ffy: -14, ffa: 0 },
+      { t: 0.84, torso: -80, aNU: 42, aNL: 16, aFU: 140, aFL: 162, pdx: -1, rdy: -3, bdx: 1, bdy: -6, ba: 0, fnx: 20, fny: -3, fna: 0, ffx: -29, ffy: -3, ffa: 0 }
+    ]
+  };
+  const RIG_FIELDS = ['torso', 'aNU', 'aNL', 'aFU', 'aFL', 'pdx', 'rdy', 'bdx', 'bdy', 'ba', 'fnx', 'fny', 'fna', 'ffx', 'ffy', 'ffa'];
+  function rigRad(d) { return d * Math.PI / 180; }
+  function rigPt(o, a, l) { return { x: o.x + Math.cos(a) * l, y: o.y + Math.sin(a) * l }; }
+  function rigSampleCycle(keys, p) {
+    const ph = ((p % 1) + 1) % 1;
+    let i = 0;
+    for (let k = 0; k < keys.length; k++) if (keys[k].t <= ph) i = k;
+    const a = keys[i], b = keys[(i + 1) % keys.length];
+    const span = (b === keys[0] ? 1 + b.t : b.t) - a.t;
+    let u = span <= 0 ? 0 : (ph - a.t) / span;
+    u = u * u * (3 - 2 * u);
+    const out = {};
+    RIG_FIELDS.forEach(f => { out[f] = a[f] + (b[f] - a[f]) * u; });
+    return out;
+  }
+  function rigIk(h, target, l1, l2, bend) {
+    const dx = target.x - h.x, dy = target.y - h.y;
+    let d = Math.hypot(dx, dy);
+    d = Math.max(Math.abs(l1 - l2) + 0.01, Math.min(l1 + l2 - 0.01, d));
+    const base = Math.atan2(dy, dx);
+    const c = Math.max(-1, Math.min(1, (d * d + l1 * l1 - l2 * l2) / (2 * d * l1)));
+    const a1 = base + bend * Math.acos(c);
+    return {
+      knee: { x: h.x + Math.cos(a1) * l1, y: h.y + Math.sin(a1) * l1 },
+      foot: { x: h.x + Math.cos(base) * d, y: h.y + Math.sin(base) * d }
+    };
+  }
+  const RIG_PALETTE = { shirt: '#161616', skin: '#e8b98c', pants: '#26314a', shoe: '#101010' };
+  function rigPose(cycleName, phase, weight) {
+    const k = rigSampleCycle(RIG_CYCLES[cycleName] || RIG_CYCLES['Cruise'], phase);
+    const bo = { x: k.bdx, y: RIG_DECK_Y + k.bdy };
+    const bar = rigRad(k.ba);
+    const onDeck = (tx, ty) => ({
+      x: bo.x + Math.cos(bar) * tx - Math.sin(bar) * ty,
+      y: bo.y + Math.sin(bar) * tx + Math.cos(bar) * ty
+    });
+    const root = { x: k.pdx, y: RIG_BASE_Y + k.rdy };
+    const ta = rigRad(k.torso);
+    const chest = rigPt(root, ta, RIG_L.torso);
+    const perp = { x: -Math.sin(ta), y: Math.cos(ta) };
+    const shN = { x: root.x + Math.cos(ta) * 39 - perp.x * 3, y: root.y + Math.sin(ta) * 39 - perp.y * 3 };
+    const shF = { x: root.x + Math.cos(ta) * 39 + perp.x * 3, y: root.y + Math.sin(ta) * 39 + perp.y * 3 };
+    const hipN = { x: root.x - perp.x * 3, y: root.y - perp.y * 3 };
+    const hipF = { x: root.x + perp.x * 3, y: root.y + perp.y * 3 };
+    const head = rigPt(chest, ta, 8);
+    const collar = rigPt(chest, ta, 6);
+    const neck = rigPt(chest, ta, 11);
+    const elbN = rigPt(shN, rigRad(k.aNU), RIG_L.armU), handN = rigPt(elbN, rigRad(k.aNL), RIG_L.armL);
+    const elbF = rigPt(shF, rigRad(k.aFU), RIG_L.armU), handF = rigPt(elbF, rigRad(k.aFL), RIG_L.armL);
+    const legN = rigIk(hipN, onDeck(k.fnx, k.fny), RIG_L.thigh, RIG_L.shin, RIG_KNEE);
+    const legF = rigIk(hipF, onDeck(k.ffx, k.ffy), RIG_L.thigh, RIG_L.shin, RIG_KNEE);
+    const toeN = rigPt(legN.foot, bar + rigRad(k.fna), RIG_L.foot);
+    const toeF = rigPt(legF.foot, bar + rigRad(k.ffa), RIG_L.foot);
+    const C = RIG_PALETTE;
+    const farO = 0.55;
+    const seg = (a, b, mul, color, o) => ({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, w: weight * mul, color: color, o: o == null ? 1 : o });
+    return {
+      segments: [
+        seg(hipF, legF.knee, 1.5, C.pants, farO),
+        seg(legF.knee, legF.foot, 1.3, C.pants, farO),
+        seg(legF.foot, toeF, 0.78, C.shoe, farO),
+        seg(shF, elbF, 1.2, C.shirt, farO),
+        seg(elbF, handF, 0.68, C.skin, farO),
+        seg(chest, neck, 1.1, C.skin, 1),
+        seg(root, collar, 2.1, C.shirt, 1),
+        seg(hipN, legN.knee, 1.6, C.pants, 1),
+        seg(legN.knee, legN.foot, 1.35, C.pants, 1),
+        seg(legN.foot, toeN, 0.86, C.shoe, 1),
+        seg(shN, elbN, 1.25, C.shirt, 1),
+        seg(elbN, handN, 0.72, C.skin, 1)
+      ],
+      head: { cx: head.x, cy: head.y, r: 13 }
+    };
+  }
+  // choisit le cycle + la progression selon l'état de jeu du joueur
+  function currentRigCycleAndPhase() {
+    if (trick) {
+      const trickProgress = trick.elapsed / trick.duration;
+      if (trick.kind === 'kickflip') return { cycle: 'Flip', phase: trickProgress };
+      if (trick.kind === 'shuvit') return { cycle: 'Pop shove-it', phase: trickProgress };
+      return { cycle: 'Ollie', phase: trickProgress };
+    }
+    if (!player.onGround && !grinding) {
+      return { cycle: 'Ollie', phase: Math.min(0.86, player.airFrames / 40) };
+    }
+    if (state === 'running') {
+      return { cycle: 'Cruise', phase: (frame * 0.018) % 1 };
+    }
+    return { cycle: 'Cruise', phase: 0 };
+  }
+  // dessine Freestill en squelette articulé au lieu du sprite bitmap, ancré
+  // au niveau du plateau de la planche (dessinée séparément par
+  // drawSkateboardUnderFeet) pour que les pieds restent bien calés dessus
+  function drawArticulatedSkater(drawW, drawH) {
+    const { cycle, phase } = currentRigCycleAndPhase();
+    const pose = rigPose(cycle, phase, 3.6);
+    const scale = 0.62;
+    const anchorX = drawW / 2, anchorY = drawH - 6;
+    const toLocal = (x, y) => ({ x: anchorX + x * scale, y: anchorY + (y - RIG_DECK_Y) * scale });
+
+    ctx.lineCap = 'round';
+    for (const s of pose.segments) {
+      const p1 = toLocal(s.x1, s.y1), p2 = toLocal(s.x2, s.y2);
+      ctx.globalAlpha = s.o;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = Math.max(1.5, s.w * scale);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // tête : crâne + mèche blonde, simplifié pour la petite échelle de jeu
+    const hp = toLocal(pose.head.cx, pose.head.cy);
+    const hr = pose.head.r * scale;
+    ctx.fillStyle = RIG_PALETTE.skin;
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, hr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8c468';
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y - hr * 0.3, hr, Math.PI, 0);
+    ctx.fill();
+  }
+
   function drawPlayer() {
     ctx.save();
     const drawH = player.h + 10;
@@ -2478,7 +2646,9 @@
       ctx.translate(-drawW / 2, -drawH);
     }
 
-    if (charImg.complete && charImg.naturalWidth > 0) {
+    if (selectedCharacter === 'freestyle') {
+      drawArticulatedSkater(drawW, drawH);
+    } else if (charImg.complete && charImg.naturalWidth > 0) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(charImg, 0, 0, drawW, drawH);
     } else {
