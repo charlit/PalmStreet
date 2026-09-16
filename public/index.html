@@ -1524,7 +1524,7 @@
       y: boss.y + boss.airOffset - 20,
       w: 22, h: 34,
       type: 'cone', mode: 'jump',
-      falling: true, vy: 0
+      falling: true, vy: 0, fromBoss: true
     });
     Audio2.jumpSfx();
   }
@@ -2088,7 +2088,7 @@
           ctx.rotate((ob.vy || 0) * 0.15);
           ctx.translate(-ccx, -ccy);
         }
-        ctx.fillStyle = '#ff7a1a';
+        ctx.fillStyle = ob.fromBoss ? '#c0392b' : '#ff7a1a';
         ctx.beginPath();
         ctx.moveTo(ob.x + ob.w / 2, ob.y);
         ctx.lineTo(ob.x + ob.w - 2, ob.y + ob.h);
@@ -2097,6 +2097,31 @@
         ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.fillRect(ob.x + 3, ob.y + ob.h * 0.55, ob.w - 6, 4);
+
+        // plot lâché par le boss : plot en feu, langues de flammes animées
+        // qui jaillissent du sommet, même style que le boss
+        if (ob.fromBoss) {
+          const fcx = ob.x + ob.w / 2, fbaseY = ob.y + 2;
+          for (let i = 0; i < 4; i++) {
+            const ang = -Math.PI / 2 + (i - 1.5) * 0.4 + Math.sin(frame * 0.3 + i) * 0.1;
+            const wob = Math.sin(frame * 0.45 + i * 1.7) * 2;
+            const len = 10 + wob + i * 1.5;
+            const baseX = fcx + Math.cos(ang) * 3;
+            const baseY = fbaseY + Math.sin(ang) * 3;
+            const tipX = baseX + Math.cos(ang) * len;
+            const tipY = baseY + Math.sin(ang) * len;
+            const leanAng = ang + 0.4 + Math.sin(frame * 0.5 + i) * 0.15;
+            const midX = baseX + Math.cos(leanAng) * (len * 0.55);
+            const midY = baseY + Math.sin(leanAng) * (len * 0.55);
+            ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
+            ctx.beginPath();
+            ctx.moveTo(baseX - Math.cos(ang + Math.PI / 2) * 2.5, baseY - Math.sin(ang + Math.PI / 2) * 2.5);
+            ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+            ctx.quadraticCurveTo(baseX, baseY, baseX + Math.cos(ang + Math.PI / 2) * 2.5, baseY + Math.sin(ang + Math.PI / 2) * 2.5);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
         if (ob.falling) ctx.restore();
       } else if (ob.type === 'rail') {
         const active = grinding === ob;
