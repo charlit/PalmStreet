@@ -2186,20 +2186,26 @@
     const wheelXs = [-deckW / 2 + 20, deckW / 2 - 20];
     const wheelY = deckH / 2 + wheelR - 3;
 
-    // flammes qui jaillissent de chaque roue (pas une auréole générale : ça
-    // doit clairement lire comme "les roues sont en feu")
+    // flammes qui jaillissent de chaque roue (langues de feu incurvées qui
+    // ondulent, pas une auréole générale : ça doit clairement lire comme
+    // "les roues sont en feu")
     for (const wx of wheelXs) {
-      for (let i = 0; i < 5; i++) {
-        const ang = -Math.PI / 2 + (i - 2) * 0.55 + Math.sin(boss.flameFrame * 0.3 + i + wx) * 0.12;
-        const wob = Math.sin(boss.flameFrame * 0.4 + i * 1.7 + wx) * 2;
-        const len = wheelR + 6 + wob + i * 1.4;
-        const fx = wx + Math.cos(ang) * (wheelR - 3);
-        const fy = wheelY + Math.sin(ang) * (wheelR - 3);
+      for (let i = 0; i < 6; i++) {
+        const ang = -Math.PI / 2 + (i - 2.5) * 0.48 + Math.sin(boss.flameFrame * 0.3 + i + wx) * 0.12;
+        const wob = Math.sin(boss.flameFrame * 0.45 + i * 1.7 + wx) * 2.5;
+        const len = wheelR + 7 + wob + i * 1.3;
+        const baseX = wx + Math.cos(ang) * (wheelR - 3);
+        const baseY = wheelY + Math.sin(ang) * (wheelR - 3);
+        const tipX = baseX + Math.cos(ang) * len;
+        const tipY = baseY + Math.sin(ang) * len;
+        const leanAng = ang + 0.4 + Math.sin(boss.flameFrame * 0.5 + i) * 0.15;
+        const midX = baseX + Math.cos(leanAng) * (len * 0.55);
+        const midY = baseY + Math.sin(leanAng) * (len * 0.55);
         ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
         ctx.beginPath();
-        ctx.moveTo(fx, fy);
-        ctx.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
-        ctx.lineTo(fx + Math.cos(ang + 0.35) * (len * 0.4), fy + Math.sin(ang + 0.35) * (len * 0.4));
+        ctx.moveTo(baseX - Math.cos(ang + Math.PI / 2) * 3, baseY - Math.sin(ang + Math.PI / 2) * 3);
+        ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+        ctx.quadraticCurveTo(baseX, baseY, baseX + Math.cos(ang + Math.PI / 2) * 3, baseY + Math.sin(ang + Math.PI / 2) * 3);
         ctx.closePath();
         ctx.fill();
       }
@@ -2257,16 +2263,102 @@
     ctx.fillStyle = '#ff3b1a';
     ctx.fillRect(-deckW / 2 + 6, deckH / 2 - 3, deckW - 12, 3);
 
-    // oeil menaçant sur le kicktail avant
-    const eyeX = deckW / 2 - 20;
-    ctx.fillStyle = '#fff';
+    // squelette debout sur le deck, crâne enflammé
+    const skelBaseY = -deckH / 2 - 9;
+    ctx.strokeStyle = '#e8e2d0';
+    ctx.fillStyle = '#e8e2d0';
+    ctx.lineCap = 'round';
+
+    // jambes
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.ellipse(eyeX, -deckH / 2 - 5, 10, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#c00';
+    ctx.moveTo(-10, skelBaseY);
+    ctx.lineTo(-9, skelBaseY - 26);
+    ctx.moveTo(10, skelBaseY);
+    ctx.lineTo(9, skelBaseY - 26);
+    ctx.stroke();
+
+    // bassin
+    ctx.fillRect(-11, skelBaseY - 30, 22, 8);
+
+    // cage thoracique
+    const chestY = skelBaseY - 30;
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 4; i++) {
+      const ry = chestY - 6 - i * 6;
+      ctx.beginPath();
+      ctx.moveTo(-9, ry);
+      ctx.quadraticCurveTo(0, ry + 4, 9, ry);
+      ctx.stroke();
+    }
+
+    // colonne vertébrale
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(eyeX + Math.sin(boss.flameFrame * 0.15) * 3, -deckH / 2 - 5, 4, 0, Math.PI * 2);
+    ctx.moveTo(0, chestY);
+    ctx.lineTo(0, chestY - 26);
+    ctx.stroke();
+
+    // bras écartés, légère oscillation menaçante
+    const shoulderY = chestY - 26;
+    const armSwing = Math.sin(boss.flameFrame * 0.08) * 6;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(0, shoulderY);
+    ctx.lineTo(-24, shoulderY + 8 + armSwing);
+    ctx.moveTo(0, shoulderY);
+    ctx.lineTo(24, shoulderY - 8 - armSwing);
+    ctx.stroke();
+
+    // crâne
+    const skullY = shoulderY - 14;
+    ctx.fillStyle = '#f2ede0';
+    ctx.beginPath();
+    ctx.arc(0, skullY, 13, Math.PI, 0);
+    ctx.lineTo(9, skullY + 10);
+    ctx.quadraticCurveTo(0, skullY + 15, -9, skullY + 10);
+    ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = '#8a8370';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // orbites, nez, dents
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(-5, skullY - 1, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5, skullY - 1, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, skullY + 3);
+    ctx.lineTo(-2, skullY + 7);
+    ctx.lineTo(2, skullY + 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 0.8;
+    for (let i = -6; i <= 6; i += 3) {
+      ctx.beginPath();
+      ctx.moveTo(i, skullY + 9);
+      ctx.lineTo(i, skullY + 12);
+      ctx.stroke();
+    }
+
+    // flammes qui jaillissent du crâne (même logique animée que les roues)
+    for (let i = 0; i < 5; i++) {
+      const ang = -Math.PI / 2 + (i - 2) * 0.5 + Math.sin(boss.flameFrame * 0.3 + i) * 0.1;
+      const wob = Math.sin(boss.flameFrame * 0.4 + i * 1.7) * 2;
+      const len = 14 + wob + i * 1.6;
+      const fx = Math.cos(ang) * 4, fy = skullY - 13 + Math.sin(ang) * 4;
+      const tipX = fx + Math.cos(ang) * len, tipY = fy + Math.sin(ang) * len;
+      const leanAng = ang + 0.4 + Math.sin(boss.flameFrame * 0.5 + i) * 0.15;
+      const midX = fx + Math.cos(leanAng) * (len * 0.55), midY = fy + Math.sin(leanAng) * (len * 0.55);
+      ctx.fillStyle = i % 2 === 0 ? '#ff7a1a' : '#ffd400';
+      ctx.beginPath();
+      ctx.moveTo(fx - Math.cos(ang + Math.PI / 2) * 3, fy - Math.sin(ang + Math.PI / 2) * 3);
+      ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+      ctx.quadraticCurveTo(fx, fy, fx + Math.cos(ang + Math.PI / 2) * 3, fy + Math.sin(ang + Math.PI / 2) * 3);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     ctx.restore();
   }
