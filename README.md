@@ -101,7 +101,10 @@ sudo tailscale funnel --bg off
 - Les scores et visites sont dans `PalmStreet/data/scores.json`
   et `visits.json` — tu peux les ouvrir avec `cat data/scores.json` ou
   les éditer/sauvegarder comme n'importe quel fichier.
-- Pour consulter les visites : `https://TON_URL_FUNNEL/api/visits?key=TON_MOT_DE_PASSE`
+- Pour consulter les visites avec une page lisible (tableau triable,
+  filtre, statistiques) : `https://TON_URL_FUNNEL/visits.html`, puis entre
+  ton `VISITS_KEY` quand elle te la demande. L'API brute reste disponible
+  sur `https://TON_URL_FUNNEL/api/visits?key=TON_MOT_DE_PASSE`.
 
 ## 6. Mettre à jour le jeu plus tard
 
