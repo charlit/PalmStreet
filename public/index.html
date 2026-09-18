@@ -943,7 +943,7 @@
   let nextBossScore = BOSS_TRIGGER_SCORE; // score qui déclenche le prochain boss (repoussé de 15000 après chaque victoire)
   let noSpawnUntilDistance = 0; // pas d'obstacle/pièce avant cette distance monde (zone plate après un boss)
   let noseTilt = 0;             // inclinaison de la planche pendant un nose grind (0 = à plat)
-  const POST_BOSS_FLAT_LENGTH = 1700; // longueur du plat qui suit un boss vaincu
+  const POST_BOSS_FLAT_LENGTH = 2500; // longueur du plat qui suit un boss vaincu
   let boss = null;   // { x, y, hp, maxHp, flameFrame, hitFlash, bob, airOffset, phase, ... }
   let teeth = [];    // projectiles envoyés sur le boss : { x, y, vx }
   let toothCooldown = 0;
@@ -1609,7 +1609,7 @@
     terrainSegments = [{ start: totalDistance - 200, end: totalDistance + POST_BOSS_FLAT_LENGTH, elevStart: 0, elevEnd: 0, kind: 'flat' }];
     terrainGenUpTo = totalDistance + POST_BOSS_FLAT_LENGTH;
     noSpawnUntilDistance = totalDistance + POST_BOSS_FLAT_LENGTH;
-    const railW = 70 * 5, railH = 14 * 2;
+    const railW = 70 * 15, railH = 14 * 2;
     obstacles.push({ x: W + 520, type: 'rail', big: true, noseGrind: true, w: railW, h: railH, y: GROUND_Y - railH, mode: 'jump' });
     nextSpawnIn = 60;
     bigRailThreshold = (Math.floor(score / 5000) + 1) * 5000;
