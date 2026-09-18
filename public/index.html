@@ -117,6 +117,40 @@
     opacity: 1;
     transform: translate(-50%, 0) scale(1);
   }
+  #boomText {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.2);
+    color: #ffd400;
+    font-family: 'Courier New', monospace;
+    font-weight: 900;
+    font-size: clamp(72px, 26vw, 128px);
+    letter-spacing: 4px;
+    -webkit-text-stroke: 4px #c0392b;
+    text-shadow: 0 0 24px #ff7a1a, 0 0 60px #ff3b1a, 6px 6px 0 #7a1f10;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 60;
+  }
+  #boomText.show { animation: boomPop 1.6s ease-out forwards; }
+  @keyframes boomPop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); }
+    12%  { opacity: 1; transform: translate(-50%, -50%) scale(1.35) rotate(4deg); }
+    22%  { transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+    70%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(0deg); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25) rotate(0deg); }
+  }
+  #boomFlash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 55;
+  }
+  #boomFlash.show { animation: boomFlash 0.5s ease-out forwards; }
+  @keyframes boomFlash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
   #bossHud {
     position: absolute;
     top: 44px;
@@ -433,6 +467,8 @@
   <div id="best">BEST 0</div>
   <div id="combo">COMBO x1</div>
   <div id="milestoneBanner"></div>
+  <div id="boomFlash"></div>
+  <div id="boomText">BOOM</div>
   <div id="bossHud">
     <div class="bossLabel">BOSS</div>
     <div class="bossBarOuter"><div class="bossBarInner" id="bossBarInner"></div></div>
@@ -693,8 +729,18 @@
   const bossHud = document.getElementById('bossHud');
   const bossBarInner = document.getElementById('bossBarInner');
 
+  function showBoom() {
+    for (const id of ['boomFlash', 'boomText']) {
+      const el = document.getElementById(id);
+      el.classList.remove('show');
+      void el.offsetWidth;
+      el.classList.add('show');
+    }
+  }
+
   function showMilestoneBanner(text, duration) {
     milestoneBanner.textContent = text;
+    milestoneBanner.style.fontSize = text.length > 14 ? 'clamp(18px, 6vw, 28px)' : '';
     milestoneBanner.classList.add('show');
     clearTimeout(milestoneBanner._hideTimer);
     milestoneBanner._hideTimer = setTimeout(() => {
@@ -897,7 +943,7 @@
   let nextBossScore = BOSS_TRIGGER_SCORE; // score qui déclenche le prochain boss (repoussé de 15000 après chaque victoire)
   let noSpawnUntilDistance = 0; // pas d'obstacle/pièce avant cette distance monde (zone plate après un boss)
   let noseTilt = 0;             // inclinaison de la planche pendant un nose grind (0 = à plat)
-  const POST_BOSS_FLAT_LENGTH = 1100; // longueur du plat qui suit un boss vaincu
+  const POST_BOSS_FLAT_LENGTH = 1700; // longueur du plat qui suit un boss vaincu
   let boss = null;   // { x, y, hp, maxHp, flameFrame, hitFlash, bob, airOffset, phase, ... }
   let teeth = [];    // projectiles envoyés sur le boss : { x, y, vx }
   let toothCooldown = 0;
@@ -1553,6 +1599,7 @@
     boss = null;
     teeth = [];
     bossHud.classList.remove('show');
+    showBoom();
     showMilestoneBanner('TU ES UN VRAI PST !', 2600);
 
     // le jeu continue : sol plat + une longue barre de grind (nose grind) à
@@ -1563,7 +1610,7 @@
     terrainGenUpTo = totalDistance + POST_BOSS_FLAT_LENGTH;
     noSpawnUntilDistance = totalDistance + POST_BOSS_FLAT_LENGTH;
     const railW = 70 * 5, railH = 14 * 2;
-    obstacles.push({ x: W + 60, type: 'rail', big: true, noseGrind: true, w: railW, h: railH, y: GROUND_Y - railH, mode: 'jump' });
+    obstacles.push({ x: W + 520, type: 'rail', big: true, noseGrind: true, w: railW, h: railH, y: GROUND_Y - railH, mode: 'jump' });
     nextSpawnIn = 60;
     bigRailThreshold = (Math.floor(score / 5000) + 1) * 5000;
     milestoneNextThreshold = bigRailThreshold;
