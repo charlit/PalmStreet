@@ -874,6 +874,12 @@
     else if (state === 'running') { Audio2.startMusic(); }
   });
 
+  // Sur téléphone en portrait, le canvas prend toute la hauteur de l'écran : même largeur de jeu (390),
+  // ciel plus haut. Le sol reste à 60 px du bas, donc le gameplay ne change pas.
+  if (matchMedia('(pointer: coarse)').matches && innerHeight > innerWidth) {
+    const shownW = Math.min(innerWidth, 460) - 16 - 8;   // #wrap (max 460 px, marges 8 px) moins la bordure de 4 px
+    canvas.height = Math.round(Math.min(Math.max(canvas.width * (innerHeight - 8) / shownW, 620), 1000));
+  }
   const W = canvas.width, H = canvas.height;
   const GROUND_Y = H - 60;
 
